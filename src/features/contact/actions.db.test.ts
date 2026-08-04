@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { prisma } from '@/lib/db';
+import { prisma } from '@qhakaza/shared-db';
 import { resetDb } from '@tests/helpers/db';
 
 const { submitContactMessage } = await import('./actions');

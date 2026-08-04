@@ -1,0 +1,565 @@
+// Qhakaza Art Collective — the single shared database.
+//
+// One database, three applications: Vera (public artist site), Collector
+// Platform (private, invite-only) and Command Center (admin hub). Every app
+// reaches this schema through @qhakaza/shared-db and nothing else.
+//
+// FIELD CONVENTION
+// Every core entity carries the four standard fields. The Prisma property names
+// stay camelCase (TypeScript idiom); `@map` gives the *columns* the specified
+// names, so the database matches the spec exactly with no application churn:
+//
+//   id          → id
+//   createdAt   → created_date
+//   updatedAt   → updated_date
+//   createdById → created_by_id
+//
+// `created_by_id` is a plain indexed column, deliberately NOT a foreign key:
+// audit and provenance must survive the deletion of the user who acted, and
+// some rows are created by anonymous visitors or by the system itself. It is
+// nullable because rows predating this convention have no author, and this
+// project neither fabricates nor deletes data.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Roles
+// ---------------------------------------------------------------------------
+
+/// The four roles the platform recognises. ADVISOR sits alongside ADMIN on the
+/// Command Center side: advisors run matching and concierge work but are not
+/// platform administrators.
+enum Role {
+  ARTIST
+  COLLECTOR
+  ADMIN
+  ADVISOR
+}
+
+enum ArtStatus {
+  DRAFT
+  LISTED
+  SOLD
+  HIDDEN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  REFUNDED
+}
+
+enum CollectorIntakeStatus {
+  /// The intake form is complete; verification has not yet run.
+  AWAITING_VERIFICATION
+  UNDER_REVIEW
+  ACCEPTED
+  DECLINED
+}
+
+enum VerificationOutcome {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  LAPSED
+  DECLINED
+  REVOKED
+}
+
+enum InvitationStatus {
+  ISSUED
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+/// Why an attempt to activate a `/private/<token>` route succeeded or failed.
+/// Every failure is recorded — a token being probed is a security signal.
+enum ActivationOutcome {
+  SUCCESS
+  MISSING_TOKEN
+  INVALID_TOKEN
+  EXPIRED_TOKEN
+  REVOKED_TOKEN
+  ROLE_DENIED
+}
+
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum NoteStatus {
+  SUBMITTED
+  IN_REVIEW
+  ACTIONED
+  ARCHIVED
+}
+
+enum PartnerStatus {
+  PROSPECT
+  ACTIVE
+  DORMANT
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  role          Role      @default(COLLECTOR)
+  avatar        String?
+  bio           String?
+  createdAt     DateTime  @default(now()) @map("created_date")
+  updatedAt     DateTime  @updatedAt @map("updated_date")
+  createdById   String?   @map("created_by_id")
+
+  artist      Artist?
+  orders      Order[]
+  favorites   Favorite[]
+  accounts    Account[]
+  sessions    Session[]
+  memberships Membership[]
+
+  @@index([role])
+  @@index([createdById])
+}
+
+// ---------------------------------------------------------------------------
+// Supply side — Vera
+// ---------------------------------------------------------------------------
+
+/// Core entity 5. Was `ArtistProfile`; renamed to match the canonical entity
+/// list. The table was renamed in place, not recreated.
+model Artist {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  displayName String
+  slug        String   @unique
+  statement   String?
+  socials     Json?
+  approved    Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artworks Artwork[]
+
+  @@index([approved])
+  @@index([createdById])
+}
+
+/// Core entity 6. Was `ArtPiece`.
+model Artwork {
+  id          String    @id @default(cuid())
+  artistId    String
+  title       String
+  description String
+  images      String[]
+  medium      String
+  dimensions  String
+  price       Decimal   @db.Decimal(12, 2)
+  currency    String    @default("ZAR")
+  status      ArtStatus @default(DRAFT)
+  createdAt   DateTime  @default(now()) @map("created_date")
+  updatedAt   DateTime  @updatedAt @map("updated_date")
+  createdById String?   @map("created_by_id")
+
+  artist    Artist                  @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  orders    Order[]
+  favorites Favorite[]
+  notes     PrivateNoteSubmission[]
+
+  @@index([artistId])
+  @@index([status])
+  @@index([medium])
+  @@index([createdById])
+}
+
+// ---------------------------------------------------------------------------
+// Collector side
+// ---------------------------------------------------------------------------
+
+/// Core entity 2. Was `CollectorApplication`.
+///
+/// Holds **sensitive personal and financial information** — income and
+/// liquid-asset bands, contact details, free text about someone's wealth.
+/// Everything but name and email is optional by design. Any screen reading this
+/// table is privileged; rows are never logged.
+model CollectorIntake {
+  id     String                @id @default(cuid())
+  status CollectorIntakeStatus @default(AWAITING_VERIFICATION)
+
+  fullName String
+  email    String
+  phone    String?
+  country  String?
+  city     String?
+
+  annualIncomeBand String?
+  liquidAssetsBand String?
+
+  collectingGoal String?
+  artExposure    String?
+  /// Free-form rather than an enum: the medium list is marketing copy that will
+  /// change without a migration, and a stale enum would reject a live option.
+  preferredMediums String[]
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  verification CollectorVerification?
+  membership   Membership?
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@index([createdById])
+}
+
+/// Core entity 3. The outcome of vetting an intake. Separate from the intake so
+/// the applicant's submission and the platform's judgement of it are never
+/// confused, and so verification can be re-run without touching what was said.
+model CollectorVerification {
+  id          String              @id @default(cuid())
+  intakeId    String              @unique
+  outcome     VerificationOutcome @default(PENDING)
+  notes       String?
+  decidedAt   DateTime?
+  /// The admin or advisor who decided. Not a foreign key, for the same reason
+  /// `created_by_id` is not: the decision outlives the decider's account.
+  decidedById String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  intake CollectorIntake @relation(fields: [intakeId], references: [id], onDelete: Cascade)
+
+  @@index([outcome])
+  @@index([createdById])
+}
+
+/// Core entity 1. A collector's standing on the platform.
+///
+/// `userId` is nullable: a membership can be granted and invited before the
+/// collector has ever created an account, and is linked on activation.
+model Membership {
+  id        String           @id @default(cuid())
+  userId    String?
+  intakeId  String?          @unique
+  status    MembershipStatus @default(PENDING)
+  tier      String?
+  startedAt DateTime?
+  expiresAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  user        User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  intake      CollectorIntake?        @relation(fields: [intakeId], references: [id], onDelete: SetNull)
+  invitations MemberInvitation[]
+  notes       PrivateNoteSubmission[]
+
+  @@index([status])
+  @@index([userId])
+  @@index([createdById])
+}
+
+/// Core entity 4. The invitation that unlocks `/private/<token>`.
+///
+/// `tokenHash` stores a SHA-256 of the token, never the token itself: a leaked
+/// database dump must not hand over working invitations. The plaintext exists
+/// only in the invitation email.
+model MemberInvitation {
+  id           String           @id @default(cuid())
+  membershipId String?
+  email        String
+  tokenHash    String           @unique
+  status       InvitationStatus @default(ISSUED)
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  revokedAt    DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  membership Membership?         @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  attempts   ActivationAttempt[]
+
+  @@index([status, expiresAt])
+  @@index([email])
+  @@index([createdById])
+}
+
+/// Core entity 12. Every attempt to use a private token, successful or not.
+///
+/// Stores a fingerprint of the presented token rather than the token, so this
+/// log can be read freely during an investigation without becoming a source of
+/// working credentials.
+model ActivationAttempt {
+  id               String            @id @default(cuid())
+  invitationId     String?
+  tokenFingerprint String
+  outcome          ActivationOutcome
+  ipAddress        String?
+  userAgent        String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  invitation MemberInvitation? @relation(fields: [invitationId], references: [id], onDelete: SetNull)
+
+  @@index([outcome, createdAt])
+  @@index([tokenFingerprint])
+  @@index([createdById])
+}
+
+/// Core entity 8. A private note from a collector to their advisor — an
+/// enquiry, a question about a work, a request for a viewing.
+model PrivateNoteSubmission {
+  id           String     @id @default(cuid())
+  membershipId String?
+  artworkId    String?
+  subject      String
+  body         String
+  status       NoteStatus @default(SUBMITTED)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  membership Membership? @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  artwork    Artwork?    @relation(fields: [artworkId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([membershipId])
+  @@index([createdById])
+}
+
+// ---------------------------------------------------------------------------
+// Editorial and partners
+// ---------------------------------------------------------------------------
+
+/// Core entity 7.
+model NewsArticle {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  title       String
+  category    String
+  excerpt     String
+  body        String?
+  status      ArticleStatus @default(DRAFT)
+  publishedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  @@index([status, publishedAt])
+  @@index([createdById])
+}
+
+/// Core entity 13. Galleries, advisors and institutions the platform works
+/// alongside.
+model Partner {
+  id      String        @id @default(cuid())
+  name    String
+  kind    String?
+  website String?
+  status  PartnerStatus @default(PROSPECT)
+  notes   String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  @@index([status])
+  @@index([createdById])
+}
+
+// ---------------------------------------------------------------------------
+// Observability
+// ---------------------------------------------------------------------------
+
+/// Core entity 9. Raw behavioural events.
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  name       String
+  occurredAt DateTime @default(now())
+  actorId    String?
+  sessionId  String?
+  properties Json?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  @@index([name, occurredAt])
+  @@index([actorId])
+  @@index([createdById])
+}
+
+/// Core entity 10. One row per metric per day, rolled up from AnalyticsEvent.
+model DailyMetric {
+  id     String   @id @default(cuid())
+  day    DateTime @db.Date
+  metric String
+  value  Decimal  @db.Decimal(18, 4)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  @@unique([day, metric])
+  @@index([metric, day])
+  @@index([createdById])
+}
+
+/// Core entity 11. Every sensitive action taken in the Command Center.
+///
+/// Append-only by policy: no application code updates or deletes these rows,
+/// and Phase 5's RLS matrix grants no UPDATE or DELETE on this table to any
+/// role.
+model AuditLog {
+  id         String  @id @default(cuid())
+  actorId    String?
+  actorRole  Role?
+  action     String
+  entityType String
+  entityId   String?
+  summary    String?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([createdById])
+}
+
+// ---------------------------------------------------------------------------
+// Legacy marketplace tables
+//
+// Not part of the 13 core entities. Retained because this project never deletes
+// data: the original brief's marketplace was superseded by the intelligence
+// platform, but the tables and any rows in them stay until you say otherwise.
+// ---------------------------------------------------------------------------
+
+model Order {
+  id                    String      @id @default(cuid())
+  artworkId             String
+  collectorId           String
+  amount                Decimal     @db.Decimal(12, 2)
+  currency              String      @default("ZAR")
+  status                OrderStatus @default(PENDING)
+  stripePaymentIntentId String?     @unique
+  createdAt             DateTime    @default(now()) @map("created_date")
+  updatedAt             DateTime    @updatedAt @map("updated_date")
+  createdById           String?     @map("created_by_id")
+
+  artwork   Artwork @relation(fields: [artworkId], references: [id])
+  collector User    @relation(fields: [collectorId], references: [id])
+
+  @@index([collectorId])
+  @@index([artworkId])
+  @@index([status])
+  @@index([createdById])
+}
+
+model Favorite {
+  collectorId String
+  artworkId   String
+  createdAt   DateTime @default(now()) @map("created_date")
+  createdById String?  @map("created_by_id")
+
+  collector User    @relation(fields: [collectorId], references: [id], onDelete: Cascade)
+  artwork   Artwork @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  @@id([collectorId, artworkId])
+  @@index([collectorId])
+}
+
+/// Contact form submissions from the public site.
+///
+/// Persisted rather than emailed: there is no mail provider configured yet, and
+/// a form that silently discards messages is worse than no form.
+model ContactMessage {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  subject     String
+  message     String
+  handled     Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  @@index([handled, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Auth.js adapter tables — shape is dictated by the adapter, not by us.
+// ---------------------------------------------------------------------------
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}

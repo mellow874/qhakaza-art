@@ -1,6 +1,6 @@
 'use server';
 
-import { prisma } from '@/lib/db';
+import { prisma } from '@qhakaza/shared-db';
 import { collectorApplicationSchema } from '@/lib/validation/collector';
 
 export type CollectorApplicationResult =
@@ -31,7 +31,7 @@ export async function submitCollectorApplication(
   }
 
   try {
-    await prisma.collectorApplication.create({ data: parsed.data });
+    await prisma.collectorIntake.create({ data: parsed.data });
     return { ok: true };
   } catch (error) {
     console.error('submitCollectorApplication failed', error);

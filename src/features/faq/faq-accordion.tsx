@@ -4,7 +4,7 @@ import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 
 import type { FaqItem } from '@/content/faq';
-import { cn } from '@/lib/cn';
+import { cn } from '@qhakaza/shared-ui';
 
 /**
  * Expandable question list.

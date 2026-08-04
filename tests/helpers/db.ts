@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 
-import { prisma } from '@/lib/db';
-import type { Role } from '@/lib/auth/rbac';
+import { prisma } from '@qhakaza/shared-db';
+import type { Role } from '@qhakaza/shared-auth';
 
 /**
  * Wipes every table in foreign-key-safe order. Called before each integration
@@ -9,11 +9,11 @@ import type { Role } from '@/lib/auth/rbac';
  */
 export async function resetDb() {
   await prisma.contactMessage.deleteMany();
-  await prisma.collectorApplication.deleteMany();
+  await prisma.collectorIntake.deleteMany();
   await prisma.favorite.deleteMany();
   await prisma.order.deleteMany();
-  await prisma.artPiece.deleteMany();
-  await prisma.artistProfile.deleteMany();
+  await prisma.artwork.deleteMany();
+  await prisma.artist.deleteMany();
   await prisma.account.deleteMany();
   await prisma.session.deleteMany();
   await prisma.user.deleteMany();
@@ -40,7 +40,7 @@ export async function makeArtistWithProfile(
 ) {
   const user = await makeUser('ARTIST');
 
-  const profile = await prisma.artistProfile.create({
+  const profile = await prisma.artist.create({
     data: {
       userId: user.id,
       displayName: overrides.displayName ?? `Studio ${sequence}`,

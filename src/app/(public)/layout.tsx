@@ -1,7 +1,7 @@
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
-import { auth } from '@/lib/auth';
-import { isRole } from '@/lib/auth/rbac';
+import { auth } from '@qhakaza/shared-auth/server';
+import { isRole } from '@qhakaza/shared-auth';
 
 /**
  * Chrome shared by every public page. The session is read on the server so the

@@ -1,34 +1,41 @@
 import { describe, expect, it } from 'vitest';
 
-import { authorize, isPublicPath, requiredRoleForPath } from './rbac';
+import { authorize, isPublicPath, requiredRolesForPath } from './rbac';
 
-describe('requiredRoleForPath', () => {
+describe('requiredRolesForPath', () => {
   it('fences the artist area to ARTIST', () => {
-    expect(requiredRoleForPath('/artist')).toBe('ARTIST');
-    expect(requiredRoleForPath('/artist/listings/new')).toBe('ARTIST');
+    expect(requiredRolesForPath('/artist')).toEqual(['ARTIST']);
+    expect(requiredRolesForPath('/artist/listings/new')).toEqual(['ARTIST']);
   });
 
   it('fences the collector area to COLLECTOR', () => {
-    expect(requiredRoleForPath('/collector')).toBe('COLLECTOR');
-    expect(requiredRoleForPath('/collector/favourites')).toBe('COLLECTOR');
+    expect(requiredRolesForPath('/collector')).toEqual(['COLLECTOR']);
+    expect(requiredRolesForPath('/collector/favourites')).toEqual(['COLLECTOR']);
   });
 
-  it('fences the admin area to ADMIN', () => {
-    expect(requiredRoleForPath('/admin')).toBe('ADMIN');
-    expect(requiredRoleForPath('/admin/orders/ord_1')).toBe('ADMIN');
+  it('admits both Command Center roles to the admin area', () => {
+    // ADVISOR joined ADMIN here in Phase 1: advisors run matching and concierge
+    // work inside the Command Center without being platform administrators.
+    expect(requiredRolesForPath('/admin')).toEqual(['ADMIN', 'ADVISOR']);
+    expect(requiredRolesForPath('/admin/orders/ord_1')).toEqual(['ADMIN', 'ADVISOR']);
+  });
+
+  it('fences the private collector platform to collectors and staff', () => {
+    // Role is only half the gate here — `requireToken` supplies the other half.
+    expect(requiredRolesForPath('/private/abc123')).toEqual(['COLLECTOR', 'ADMIN', 'ADVISOR']);
   });
 
   it('returns null for public paths', () => {
-    expect(requiredRoleForPath('/')).toBeNull();
-    expect(requiredRoleForPath('/browse')).toBeNull();
-    expect(requiredRoleForPath('/art/piece-1')).toBeNull();
-    expect(requiredRoleForPath('/artists/thandi-m')).toBeNull();
+    expect(requiredRolesForPath('/')).toBeNull();
+    expect(requiredRolesForPath('/browse')).toBeNull();
+    expect(requiredRolesForPath('/art/piece-1')).toBeNull();
+    expect(requiredRolesForPath('/artists/thandi-m')).toBeNull();
   });
 
   it('does not treat a lookalike prefix as a protected area', () => {
     // `/artists` is the public storefront index — it must not be fenced as `/artist`.
-    expect(requiredRoleForPath('/artists')).toBeNull();
-    expect(requiredRoleForPath('/administrators')).toBeNull();
+    expect(requiredRolesForPath('/artists')).toBeNull();
+    expect(requiredRolesForPath('/administrators')).toBeNull();
   });
 });
 

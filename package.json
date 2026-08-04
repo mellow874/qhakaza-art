@@ -17,14 +17,16 @@
     "db:up": "tsx scripts/db.ts up",
     "db:down": "tsx scripts/db.ts down",
     "db:status": "tsx scripts/db.ts status",
-    "db:migrate": "prisma migrate dev",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma migrate reset --force"
+    "db:migrate": "prisma migrate dev --schema packages/shared-db/prisma/schema.prisma",
+    "db:generate": "prisma generate --schema packages/shared-db/prisma/schema.prisma",
+    "db:push": "prisma db push --schema packages/shared-db/prisma/schema.prisma",
+    "db:seed": "tsx packages/shared-db/prisma/seed.ts",
+    "db:reset": "prisma migrate reset --force --schema packages/shared-db/prisma/schema.prisma",
+    "db:deploy": "prisma migrate deploy --schema packages/shared-db/prisma/schema.prisma"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx packages/shared-db/prisma/seed.ts",
+    "schema": "packages/shared-db/prisma/schema.prisma"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
@@ -38,7 +40,10 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tailwind-merge": "^3.6.0",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@qhakaza/shared-db": "*",
+    "@qhakaza/shared-auth": "*",
+    "@qhakaza/shared-ui": "*"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
@@ -66,5 +71,9 @@
     "typescript": "^5",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.10"
-  }
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }

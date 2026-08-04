@@ -14,8 +14,8 @@ async function main() {
   // Idempotent: wipe in FK-safe order so `npm run db:seed` can be re-run.
   await prisma.favorite.deleteMany();
   await prisma.order.deleteMany();
-  await prisma.artPiece.deleteMany();
-  await prisma.artistProfile.deleteMany();
+  await prisma.artwork.deleteMany();
+  await prisma.artist.deleteMany();
   await prisma.account.deleteMany();
   await prisma.session.deleteMany();
   await prisma.user.deleteMany();
@@ -38,7 +38,7 @@ async function main() {
         role: Role.ARTIST,
         passwordHash,
         bio: 'Painter working in oil and ochre pigment.',
-        artistProfile: {
+        artist: {
           create: {
             displayName: 'Thandi Mokoena',
             slug: 'thandi-mokoena',
@@ -48,7 +48,7 @@ async function main() {
           },
         },
       },
-      include: { artistProfile: true },
+      include: { artist: true },
     }),
     prisma.user.create({
       data: {
@@ -57,7 +57,7 @@ async function main() {
         role: Role.ARTIST,
         passwordHash,
         bio: 'Printmaker and sculptor.',
-        artistProfile: {
+        artist: {
           create: {
             displayName: 'Sipho Ndlovu Studio',
             slug: 'sipho-ndlovu',
@@ -68,7 +68,7 @@ async function main() {
           },
         },
       },
-      include: { artistProfile: true },
+      include: { artist: true },
     }),
   ]);
 
@@ -84,8 +84,8 @@ async function main() {
     ),
   );
 
-  const thandiProfileId = thandi.artistProfile!.id;
-  const siphoProfileId = sipho.artistProfile!.id;
+  const thandiProfileId = thandi.artist!.id;
+  const siphoProfileId = sipho.artist!.id;
 
   // Ten pieces across a mix of statuses, so browse, drafts, sold and moderation
   // states all have data from the first run.
@@ -175,7 +175,7 @@ async function main() {
   const created = [];
   for (const [index, piece] of pieces.entries()) {
     created.push(
-      await prisma.artPiece.create({
+      await prisma.artwork.create({
         data: {
           ...piece,
           description: `${piece.title} — ${piece.medium.toLowerCase()}, ${piece.dimensions}. Seeded sample work for local development.`,
@@ -189,7 +189,7 @@ async function main() {
   const soldPiece = created.find((piece) => piece.status === ArtStatus.SOLD)!;
   await prisma.order.create({
     data: {
-      artPieceId: soldPiece.id,
+      artworkId: soldPiece.id,
       collectorId: collectors[0].id,
       amount: soldPiece.price,
       currency: soldPiece.currency,
@@ -201,9 +201,9 @@ async function main() {
   const listed = created.filter((piece) => piece.status === ArtStatus.LISTED);
   await prisma.favorite.createMany({
     data: [
-      { collectorId: collectors[0].id, artPieceId: listed[0].id },
-      { collectorId: collectors[0].id, artPieceId: listed[2].id },
-      { collectorId: collectors[1].id, artPieceId: listed[1].id },
+      { collectorId: collectors[0].id, artworkId: listed[0].id },
+      { collectorId: collectors[0].id, artworkId: listed[2].id },
+      { collectorId: collectors[1].id, artworkId: listed[1].id },
     ],
   });
 

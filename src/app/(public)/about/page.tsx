@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { CtaBand } from '@/components/cta-band';
-import { EditorialImage } from '@/components/editorial-image';
+import { EditorialImage } from '@qhakaza/shared-ui';
 import { cta, documents, hero, position } from '@/content/about';
 
 export const metadata: Metadata = {

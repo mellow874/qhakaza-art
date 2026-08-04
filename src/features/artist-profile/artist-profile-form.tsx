@@ -2,8 +2,7 @@
 
 import { useRef, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Field } from '@/components/ui/field';
+import { Button, Field } from '@qhakaza/shared-ui';
 import { artistProfileSchema } from '@/lib/validation/user';
 
 export type ArtistProfileValues = {

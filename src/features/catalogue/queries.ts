@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/db';
+import { prisma } from '@qhakaza/shared-db';
 
 const DEFAULT_WORK_LIMIT = 8;
 const DEFAULT_ARTIST_LIMIT = 3;
@@ -18,7 +18,7 @@ export const PUBLICLY_VISIBLE_WORK = {
 } as const;
 
 export async function getFeaturedWorks({ limit = DEFAULT_WORK_LIMIT }: { limit?: number } = {}) {
-  return prisma.artPiece.findMany({
+  return prisma.artwork.findMany({
     where: PUBLICLY_VISIBLE_WORK,
     include: {
       artist: { select: { displayName: true, slug: true } },
@@ -37,18 +37,18 @@ export type FeaturedWork = Awaited<ReturnType<typeof getFeaturedWorks>>[number];
 export async function getFeaturedArtists({
   limit = DEFAULT_ARTIST_LIMIT,
 }: { limit?: number } = {}) {
-  const artists = await prisma.artistProfile.findMany({
+  const artists = await prisma.artist.findMany({
     where: {
       approved: true,
-      artPieces: { some: { status: 'LISTED' } },
+      artworks: { some: { status: 'LISTED' } },
     },
     select: {
       id: true,
       displayName: true,
       slug: true,
       statement: true,
-      _count: { select: { artPieces: { where: { status: 'LISTED' } } } },
-      artPieces: {
+      _count: { select: { artworks: { where: { status: 'LISTED' } } } },
+      artworks: {
         where: { status: 'LISTED' },
         orderBy: { createdAt: 'desc' },
         take: 1,
@@ -59,10 +59,10 @@ export async function getFeaturedArtists({
     take: limit,
   });
 
-  return artists.map(({ _count, artPieces, ...artist }) => ({
+  return artists.map(({ _count, artworks, ...artist }) => ({
     ...artist,
-    availableCount: _count.artPieces,
-    coverImage: artPieces[0]?.images[0] ?? null,
+    availableCount: _count.artworks,
+    coverImage: artworks[0]?.images[0] ?? null,
   }));
 }
 

@@ -1,7 +1,7 @@
 import Image from 'next/image';
 
 import { IMAGES } from '@/content/images';
-import { cn } from '@/lib/cn';
+import { cn } from '@qhakaza/shared-ui';
 
 /**
  * A photograph that may not exist yet.

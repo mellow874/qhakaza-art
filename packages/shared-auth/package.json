@@ -1,0 +1,21 @@
+{
+  "name": "@qhakaza/shared-auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./guards": "./src/guards.ts",
+    "./config": "./src/auth.config.ts"
+  },
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.11.3",
+    "@qhakaza/shared-db": "*",
+    "bcryptjs": "^3.0.3",
+    "next-auth": "^5.0.0-beta.32",
+    "zod": "^4.4.3"
+  }
+}

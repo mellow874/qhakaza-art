@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { EditorialImage } from '@/components/editorial-image';
+import { EditorialImage } from '@qhakaza/shared-ui';
 import type { Briefing } from '@/content/briefings';
 
 /**

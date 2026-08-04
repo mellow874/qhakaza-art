@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { buttonStyles } from '@/components/ui/button';
+import { buttonStyles } from '@qhakaza/shared-ui';
 import { methodology } from '@/content/collectors';
 
 /**

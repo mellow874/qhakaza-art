@@ -1,4 +1,4 @@
-import { cn } from '@/lib/cn';
+import { cn } from '@qhakaza/shared-ui';
 
 /**
  * The repeated section opening: a tan letterspaced eyebrow, a short rule, then

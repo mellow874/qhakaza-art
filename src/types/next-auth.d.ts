@@ -1,6 +1,6 @@
 import type { DefaultSession } from 'next-auth';
 
-import type { Role } from '@/lib/auth/rbac';
+import type { Role } from '@qhakaza/shared-auth';
 
 declare module 'next-auth' {
   interface Session {

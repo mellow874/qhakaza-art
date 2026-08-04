@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { apply } from '@/content/collectors';
-import { prisma } from '@/lib/db';
+import { prisma } from '@qhakaza/shared-db';
 import { resetDb } from '@tests/helpers/db';
 
 const { submitCollectorApplication } = await import('./actions');
@@ -31,7 +31,7 @@ describe('submitCollectorApplication', () => {
 
     expect(result.ok).toBe(true);
 
-    const stored = await prisma.collectorApplication.findFirstOrThrow();
+    const stored = await prisma.collectorIntake.findFirstOrThrow();
     expect(stored.fullName).toBe(FULL.fullName);
     expect(stored.city).toBe('Johannesburg');
     expect(stored.annualIncomeBand).toBe(FULL.annualIncomeBand);
@@ -45,7 +45,7 @@ describe('submitCollectorApplication', () => {
 
     expect(result.ok).toBe(true);
 
-    const stored = await prisma.collectorApplication.findFirstOrThrow();
+    const stored = await prisma.collectorIntake.findFirstOrThrow();
     expect(stored.annualIncomeBand).toBeNull();
     expect(stored.liquidAssetsBand).toBeNull();
     expect(stored.preferredMediums).toEqual([]);
@@ -54,14 +54,14 @@ describe('submitCollectorApplication', () => {
   it('rests at awaiting verification, since that step is not built', async () => {
     await submitCollectorApplication(MINIMAL);
 
-    const stored = await prisma.collectorApplication.findFirstOrThrow();
+    const stored = await prisma.collectorIntake.findFirstOrThrow();
     expect(stored.status).toBe('AWAITING_VERIFICATION');
   });
 
   it('normalises the email so one person is one applicant', async () => {
     await submitCollectorApplication({ ...MINIMAL, email: '  Thandi@Example.COM ' });
 
-    const stored = await prisma.collectorApplication.findFirstOrThrow();
+    const stored = await prisma.collectorIntake.findFirstOrThrow();
     expect(stored.email).toBe('thandi@example.com');
   });
 
@@ -73,7 +73,7 @@ describe('submitCollectorApplication', () => {
 
     expect(result).toMatchObject({ ok: false, error: 'INVALID' });
     expect(result.ok === false && result.fieldErrors?.[field]).toBeTruthy();
-    expect(await prisma.collectorApplication.count()).toBe(0);
+    expect(await prisma.collectorIntake.count()).toBe(0);
   });
 
   it('refuses a medium that is not on the published list', async () => {
@@ -84,14 +84,14 @@ describe('submitCollectorApplication', () => {
     });
 
     expect(result).toMatchObject({ ok: false, error: 'INVALID' });
-    expect(await prisma.collectorApplication.count()).toBe(0);
+    expect(await prisma.collectorIntake.count()).toBe(0);
   });
 
   it('refuses a financial band that is not on the published list', async () => {
     const result = await submitCollectorApplication({ ...MINIMAL, annualIncomeBand: 'OVER_9000' });
 
     expect(result).toMatchObject({ ok: false, error: 'INVALID' });
-    expect(await prisma.collectorApplication.count()).toBe(0);
+    expect(await prisma.collectorIntake.count()).toBe(0);
   });
 
   it('stores one medium once, however many times it is sent', async () => {
@@ -100,7 +100,7 @@ describe('submitCollectorApplication', () => {
       preferredMediums: ['Painting', 'Painting', 'Print'],
     });
 
-    const stored = await prisma.collectorApplication.findFirstOrThrow();
+    const stored = await prisma.collectorIntake.findFirstOrThrow();
     expect(stored.preferredMediums).toEqual(['Painting', 'Print']);
   });
 
@@ -108,6 +108,6 @@ describe('submitCollectorApplication', () => {
     await submitCollectorApplication(MINIMAL);
     await submitCollectorApplication({ fullName: 'Sipho Dube', email: 'sipho@example.com' });
 
-    expect(await prisma.collectorApplication.count()).toBe(2);
+    expect(await prisma.collectorIntake.count()).toBe(2);
   });
 });

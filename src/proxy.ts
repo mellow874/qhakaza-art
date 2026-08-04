@@ -1,7 +1,7 @@
 import NextAuth from 'next-auth';
 
-import { applyAccessRules, roleFromSession } from '@/lib/auth/access';
-import { authConfig } from '@/lib/auth/auth.config';
+import { applyAccessRules, roleFromSession } from '@qhakaza/shared-auth';
+import { authConfig } from '@qhakaza/shared-auth/auth.config';
 
 /**
  * Route fencing at the edge. (Next.js 16 renamed the `middleware` file

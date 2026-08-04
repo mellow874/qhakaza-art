@@ -4,9 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useId, useState } from 'react';
 
-import { buttonStyles } from '@/components/ui/button';
+import { buttonStyles, cn } from '@qhakaza/shared-ui';
 import { APPLY_CTA, brand, NAV } from '@/content/collectors';
-import { cn } from '@/lib/cn';
 
 /**
  * The Collector Intelligence Suite has its own wordmark and navigation, so it

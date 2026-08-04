@@ -1,8 +1,8 @@
 import Link from 'next/link';
 
-import { cn } from '@/lib/cn';
+import { cn } from '@qhakaza/shared-ui';
 
-import { buttonStyles } from './ui/button';
+import { buttonStyles } from '@qhakaza/shared-ui';
 
 /**
  * The closing call to action at the foot of the marketing pages.

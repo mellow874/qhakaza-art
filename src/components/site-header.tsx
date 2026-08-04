@@ -5,17 +5,24 @@ import { usePathname } from 'next/navigation';
 import { useId, useState } from 'react';
 
 import { MAIN_NAV, SIGN_IN, SUITE_CTA } from '@/content/navigation';
-import type { Role } from '@/lib/auth/rbac';
-import { cn } from '@/lib/cn';
+import type { Role } from '@qhakaza/shared-auth';
+import { cn } from '@qhakaza/shared-ui';
 
 import { Wordmark } from './wordmark';
-import { buttonStyles } from './ui/button';
+import { buttonStyles } from '@qhakaza/shared-ui';
 
-/** Where each role's own area lives, once signed in. */
+/**
+ * Where each role's own area lives, once signed in.
+ *
+ * Typed as a total `Record<Role, …>` deliberately: adding a role to the model
+ * without deciding where it lands is a type error rather than a broken link.
+ * That is how ADVISOR was caught.
+ */
 const ACCOUNT_LINKS: Record<Role, { href: string; label: string }> = {
   ARTIST: { href: '/artist/dashboard', label: 'Dashboard' },
   COLLECTOR: { href: '/collector/favourites', label: 'Favourites' },
   ADMIN: { href: '/admin', label: 'Admin' },
+  ADVISOR: { href: '/admin', label: 'Admin' },
 };
 
 export type HeaderSession = { user: { name?: string | null; role: Role } } | null;

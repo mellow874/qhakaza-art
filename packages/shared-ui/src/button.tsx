@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 
-import { cn } from '@/lib/cn';
+import { cn } from '@qhakaza/shared-ui';
 
 /**
  * Exported so a `<Link>` can wear the same styles without needing a Slot

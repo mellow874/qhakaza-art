@@ -1,6 +1,6 @@
 'use server';
 
-import { prisma } from '@/lib/db';
+import { prisma } from '@qhakaza/shared-db';
 import { contactMessageSchema } from '@/lib/validation/user';
 
 export type ContactResult =

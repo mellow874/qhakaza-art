@@ -4,8 +4,7 @@ import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Field } from '@/components/ui/field';
+import { Button, Field } from '@qhakaza/shared-ui';
 import { credentialsSchema } from '@/lib/validation/user';
 
 type Props = {

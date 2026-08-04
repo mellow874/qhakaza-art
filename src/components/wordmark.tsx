@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { cn } from '@/lib/cn';
+import { cn } from '@qhakaza/shared-ui';
 
 /**
  * The signature-style wordmark from the design: "Qhakaza" in script, with a

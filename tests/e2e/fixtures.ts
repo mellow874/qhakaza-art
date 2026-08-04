@@ -1,11 +1,14 @@
-import { PrismaClient, type Role } from '@prisma/client';
+// MUST be first. Playwright does not load .env, and the shared client reads
+// DATABASE_URL when its module body runs — static imports execute in source
+// order, so this side-effect import has to precede @qhakaza/shared-db or the
+// client is constructed against an unset connection string.
+import 'dotenv/config';
+
 import { expect, test as base, type Page } from '@playwright/test';
 import bcrypt from 'bcryptjs';
-import { config } from 'dotenv';
 
-// Playwright does not load .env, so DATABASE_URL is set explicitly rather than
-// relying on Prisma picking it up implicitly.
-config({ path: '.env', quiet: true });
+import { type Role } from '@qhakaza/shared-auth';
+import { prisma } from '@qhakaza/shared-db';
 
 /**
  * Per-test accounts.
@@ -15,9 +18,8 @@ config({ path: '.env', quiet: true });
  * parallel. Each test now gets its own freshly created user, torn down
  * afterwards, so they are independent and can run at full concurrency.
  *
- * This talks to the same database the app under test uses (DATABASE_URL).
+ * Uses the shared client: no app or test defines its own database connection.
  */
-const prisma = new PrismaClient();
 
 export const PASSWORD = 'password123';
 
@@ -45,7 +47,7 @@ async function createAccount(role: Role, withProfile: { displayName: string } | 
       passwordHash: await bcrypt.hash(PASSWORD, 10),
       ...(withProfile
         ? {
-            artistProfile: {
+            artist: {
               create: {
                 displayName: withProfile.displayName,
                 slug: `e2e-${process.pid}-${counter}`,

@@ -1,11 +1,11 @@
 ﻿import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { prisma } from '@/lib/db';
+import { prisma } from '@qhakaza/shared-db';
 import { makeArtistWithProfile, makeUser, resetDb } from '@tests/helpers/db';
 
 // The action reads the session through `auth()`; each test decides who is asking.
 const auth = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/auth', () => ({ auth }));
+vi.mock('@qhakaza/shared-auth/server', () => ({ auth }));
 
 // Revalidation is a Next.js runtime concern, irrelevant to what we assert here.
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
@@ -42,7 +42,7 @@ describe('saveArtistProfile — authorisation', () => {
 
     expect(result.ok).toBe(false);
     expect(asFailure(result).error).toBe('UNAUTHENTICATED');
-    expect(await prisma.artistProfile.count()).toBe(0);
+    expect(await prisma.artist.count()).toBe(0);
   });
 
   it('rejects a COLLECTOR', async () => {
@@ -53,7 +53,7 @@ describe('saveArtistProfile — authorisation', () => {
 
     expect(result.ok).toBe(false);
     expect(asFailure(result).error).toBe('FORBIDDEN');
-    expect(await prisma.artistProfile.count()).toBe(0);
+    expect(await prisma.artist.count()).toBe(0);
   });
 
   it('rejects an ADMIN', async () => {
@@ -64,7 +64,7 @@ describe('saveArtistProfile — authorisation', () => {
 
     expect(result.ok).toBe(false);
     expect(asFailure(result).error).toBe('FORBIDDEN');
-    expect(await prisma.artistProfile.count()).toBe(0);
+    expect(await prisma.artist.count()).toBe(0);
   });
 
   it('rejects a session whose user no longer exists', async () => {
@@ -73,7 +73,7 @@ describe('saveArtistProfile — authorisation', () => {
     const result = await saveArtistProfile(validInput);
 
     expect(result.ok).toBe(false);
-    expect(await prisma.artistProfile.count()).toBe(0);
+    expect(await prisma.artist.count()).toBe(0);
   });
 });
 
@@ -86,7 +86,7 @@ describe('saveArtistProfile — creating', () => {
 
     expect(result.ok).toBe(true);
 
-    const profile = await prisma.artistProfile.findUniqueOrThrow({
+    const profile = await prisma.artist.findUniqueOrThrow({
       where: { userId: artist.id },
     });
     expect(profile.displayName).toBe('Thandi Mokoena');
@@ -100,7 +100,7 @@ describe('saveArtistProfile — creating', () => {
 
     await saveArtistProfile(validInput);
 
-    const profile = await prisma.artistProfile.findUniqueOrThrow({ where: { userId: artist.id } });
+    const profile = await prisma.artist.findUniqueOrThrow({ where: { userId: artist.id } });
     expect(profile.slug).toBe('thandi-mokoena');
   });
 
@@ -111,7 +111,7 @@ describe('saveArtistProfile — creating', () => {
 
     await saveArtistProfile(validInput);
 
-    const profile = await prisma.artistProfile.findUniqueOrThrow({ where: { userId: artist.id } });
+    const profile = await prisma.artist.findUniqueOrThrow({ where: { userId: artist.id } });
     expect(profile.slug).toBe('thandi-mokoena-2');
   });
 
@@ -121,7 +121,7 @@ describe('saveArtistProfile — creating', () => {
 
     await saveArtistProfile(validInput);
 
-    const profile = await prisma.artistProfile.findUniqueOrThrow({ where: { userId: artist.id } });
+    const profile = await prisma.artist.findUniqueOrThrow({ where: { userId: artist.id } });
     expect(profile.approved).toBe(false);
   });
 
@@ -131,7 +131,7 @@ describe('saveArtistProfile — creating', () => {
 
     await saveArtistProfile({ ...validInput, approved: true } as never);
 
-    const profile = await prisma.artistProfile.findUniqueOrThrow({ where: { userId: artist.id } });
+    const profile = await prisma.artist.findUniqueOrThrow({ where: { userId: artist.id } });
     expect(profile.approved).toBe(false);
   });
 
@@ -153,8 +153,8 @@ describe('saveArtistProfile — updating', () => {
 
     await saveArtistProfile({ ...validInput, displayName: 'Thandi M' });
 
-    expect(await prisma.artistProfile.count()).toBe(1);
-    const profile = await prisma.artistProfile.findUniqueOrThrow({ where: { userId: artist.id } });
+    expect(await prisma.artist.count()).toBe(1);
+    const profile = await prisma.artist.findUniqueOrThrow({ where: { userId: artist.id } });
     expect(profile.displayName).toBe('Thandi M');
   });
 
@@ -166,7 +166,7 @@ describe('saveArtistProfile — updating', () => {
 
     await saveArtistProfile({ ...validInput, displayName: 'Something Entirely Different' });
 
-    const profile = await prisma.artistProfile.findUniqueOrThrow({ where: { userId: artist.id } });
+    const profile = await prisma.artist.findUniqueOrThrow({ where: { userId: artist.id } });
     expect(profile.slug).toBe('thandi-mokoena');
   });
 
@@ -176,7 +176,7 @@ describe('saveArtistProfile — updating', () => {
 
     await saveArtistProfile({ displayName: 'Renamed Studio' });
 
-    const updated = await prisma.artistProfile.findUniqueOrThrow({ where: { id: profile.id } });
+    const updated = await prisma.artist.findUniqueOrThrow({ where: { id: profile.id } });
     expect(updated.approved).toBe(true);
   });
 
@@ -187,11 +187,11 @@ describe('saveArtistProfile — updating', () => {
 
     await saveArtistProfile({ displayName: 'My Studio' });
 
-    const untouched = await prisma.artistProfile.findUniqueOrThrow({
+    const untouched = await prisma.artist.findUniqueOrThrow({
       where: { id: other.profile.id },
     });
     expect(untouched.displayName).toBe('Untouched Studio');
-    expect(await prisma.artistProfile.count()).toBe(2);
+    expect(await prisma.artist.count()).toBe(2);
   });
 });
 
@@ -205,7 +205,7 @@ describe('saveArtistProfile — validation', () => {
     expect(result.ok).toBe(false);
     expect(asFailure(result).error).toBe('INVALID');
     expect(asFailure(result).fieldErrors?.displayName).toBeTruthy();
-    expect(await prisma.artistProfile.count()).toBe(0);
+    expect(await prisma.artist.count()).toBe(0);
   });
 
   it('rejects a social link that is not a URL', async () => {
@@ -219,7 +219,7 @@ describe('saveArtistProfile — validation', () => {
 
     expect(result.ok).toBe(false);
     expect(asFailure(result).error).toBe('INVALID');
-    expect(await prisma.artistProfile.count()).toBe(0);
+    expect(await prisma.artist.count()).toBe(0);
   });
 });
 

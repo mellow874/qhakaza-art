@@ -3,7 +3,7 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 
-import { prisma } from '@/lib/db';
+import { prisma } from '@qhakaza/shared-db';
 import { credentialsSchema } from '@/lib/validation/user';
 
 import { authConfig } from './auth.config';

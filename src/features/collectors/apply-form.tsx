@@ -2,10 +2,8 @@
 
 import { useRef, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Field } from '@/components/ui/field';
+import { Button, Field, cn } from '@qhakaza/shared-ui';
 import { apply } from '@/content/collectors';
-import { cn } from '@/lib/cn';
 import { collectorApplicationSchema } from '@/lib/validation/collector';
 
 type Result = { ok: boolean; fieldErrors?: Record<string, string> };

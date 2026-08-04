@@ -1,8 +1,7 @@
 import Link from 'next/link';
 
-import { EditorialImage } from '@/components/editorial-image';
+import { EditorialImage, buttonStyles } from '@qhakaza/shared-ui';
 import { SectionHeading } from '@/components/section-heading';
-import { buttonStyles } from '@/components/ui/button';
 import { briefings as briefingItems, homeStrip } from '@/content/briefings';
 import { artistNeeds, begin, framework, hero, platformPreview } from '@/content/home';
 import { BriefingCard } from '@/features/briefings/briefing-card';

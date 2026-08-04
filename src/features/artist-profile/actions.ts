@@ -2,8 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { auth } from '@qhakaza/shared-auth/server';
+import { prisma } from '@qhakaza/shared-db';
 import { artistProfileSchema } from '@/lib/validation/user';
 
 import { uniqueSlug } from './slug';
@@ -64,18 +64,18 @@ export async function saveArtistProfile(input: unknown): Promise<SaveResult> {
   const { displayName, statement, socials } = parsed.data;
 
   try {
-    const existing = await prisma.artistProfile.findUnique({ where: { userId: user.id } });
+    const existing = await prisma.artist.findUnique({ where: { userId: user.id } });
 
     // The slug is a public URL. It is minted once and then left alone, so
     // renaming a storefront never breaks inbound links.
     const slug =
       existing?.slug ??
       (await uniqueSlug(displayName, async (candidate) => {
-        const clash = await prisma.artistProfile.findUnique({ where: { slug: candidate } });
+        const clash = await prisma.artist.findUnique({ where: { slug: candidate } });
         return clash !== null;
       }));
 
-    await prisma.artistProfile.upsert({
+    await prisma.artist.upsert({
       where: { userId: user.id },
       create: {
         userId: user.id,
@@ -108,5 +108,5 @@ export async function getMyArtistProfile() {
   const authResult = await requireArtist();
   if (!authResult.ok) return null;
 
-  return prisma.artistProfile.findUnique({ where: { userId: authResult.user.id } });
+  return prisma.artist.findUnique({ where: { userId: authResult.user.id } });
 }

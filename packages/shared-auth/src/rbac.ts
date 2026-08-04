@@ -7,33 +7,54 @@
  * re-checks authorisation against the session on the server.
  */
 
-export const ROLES = ['ARTIST', 'COLLECTOR', 'ADMIN'] as const;
+export const ROLES = ['ARTIST', 'COLLECTOR', 'ADMIN', 'ADVISOR'] as const;
 
 export type Role = (typeof ROLES)[number];
+
+/**
+ * Roles permitted inside the Command Center. Advisors run matching and
+ * concierge work; admins additionally manage permissions and platform data.
+ */
+export const COMMAND_CENTER_ROLES = ['ADMIN', 'ADVISOR'] as const satisfies readonly Role[];
+
+export function isCommandCentreRole(role: Role | null): boolean {
+  return role !== null && (COMMAND_CENTER_ROLES as readonly string[]).includes(role);
+}
 
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value);
 }
 
-/** Route areas fenced to a single role. Everything else is public. */
+/**
+ * Route areas and the roles admitted to each. Everything else is public.
+ *
+ * A list rather than a single role per area: the Command Center admits both
+ * ADMIN and ADVISOR, and collapsing that to one role would have forced a
+ * special case at every call site.
+ */
 const PROTECTED_AREAS = [
-  { prefix: '/artist', role: 'ARTIST' },
-  { prefix: '/collector', role: 'COLLECTOR' },
-  { prefix: '/admin', role: 'ADMIN' },
-] as const satisfies ReadonlyArray<{ prefix: string; role: Role }>;
+  { prefix: '/artist', roles: ['ARTIST'] },
+  { prefix: '/collector', roles: ['COLLECTOR'] },
+  { prefix: '/admin', roles: COMMAND_CENTER_ROLES },
+  // The invite-only collector platform. Role alone is not sufficient here —
+  // a valid, unexpired, unrevoked token is also required, which `requireToken`
+  // checks against MemberInvitation. This entry is the role half only.
+  { prefix: '/private', roles: ['COLLECTOR', 'ADMIN', 'ADVISOR'] },
+] as const satisfies ReadonlyArray<{ prefix: string; roles: readonly Role[] }>;
 
 /** Matches a path segment boundary, so `/artists` never matches `/artist`. */
 function isWithin(pathname: string, prefix: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
-export function requiredRoleForPath(pathname: string): Role | null {
+/** The roles admitted to `pathname`, or null if it is public. */
+export function requiredRolesForPath(pathname: string): readonly Role[] | null {
   const area = PROTECTED_AREAS.find(({ prefix }) => isWithin(pathname, prefix));
-  return area ? area.role : null;
+  return area ? area.roles : null;
 }
 
 export function isPublicPath(pathname: string): boolean {
-  return requiredRoleForPath(pathname) === null;
+  return requiredRolesForPath(pathname) === null;
 }
 
 export function loginRedirect(pathname: string): string {
@@ -56,11 +77,11 @@ export function authorize({
   pathname: string;
   role: Role | null;
 }): AuthorizeResult {
-  const required = requiredRoleForPath(pathname);
+  const required = requiredRolesForPath(pathname);
 
   if (required === null) return { allowed: true };
   if (role === null) return { allowed: false, redirectTo: loginRedirect(pathname) };
-  if (role !== required) return { allowed: false, redirectTo: '/forbidden' };
+  if (!required.includes(role)) return { allowed: false, redirectTo: '/forbidden' };
 
   return { allowed: true };
 }
@@ -73,6 +94,7 @@ export function homePathForRole(role: Role): string {
     case 'COLLECTOR':
       return '/collector/favourites';
     case 'ADMIN':
+    case 'ADVISOR':
       return '/admin';
   }
 }

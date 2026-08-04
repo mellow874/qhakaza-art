@@ -1,7 +1,6 @@
 import Link from 'next/link';
 
-import { EditorialImage } from '@/components/editorial-image';
-import { buttonStyles } from '@/components/ui/button';
+import { EditorialImage, buttonStyles } from '@qhakaza/shared-ui';
 import { belief, benefits, closing, experience, hero, news, preview } from '@/content/collectors';
 
 import { IntelligenceCard } from './intelligence-card';

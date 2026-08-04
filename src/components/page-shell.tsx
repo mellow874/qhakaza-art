@@ -1,4 +1,4 @@
-import { cn } from '@/lib/cn';
+import { cn } from '@qhakaza/shared-ui';
 
 /**
  * The recurring editorial page opening from the reference: a small uppercase

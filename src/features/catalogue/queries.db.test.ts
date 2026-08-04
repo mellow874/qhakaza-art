@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { prisma } from '@/lib/db';
+import { prisma } from '@qhakaza/shared-db';
 import { makeArtistWithProfile, resetDb } from '@tests/helpers/db';
 
 const { getFeaturedArtists, getFeaturedWorks } = await import('./queries');
@@ -12,7 +12,7 @@ type PieceOverrides = {
 };
 
 async function makePiece(artistId: string, overrides: PieceOverrides = {}) {
-  return prisma.artPiece.create({
+  return prisma.artwork.create({
     data: {
       artistId,
       title: overrides.title ?? 'A piece',

@@ -2,7 +2,7 @@
 
 import { useId } from 'react';
 
-import { cn } from '@/lib/cn';
+import { cn } from '@qhakaza/shared-ui';
 
 const CONTROL = {
   box: 'rounded-(--radius-card) border bg-surface px-4 py-3',

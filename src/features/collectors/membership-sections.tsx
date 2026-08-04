@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { buttonStyles } from '@/components/ui/button';
+import { buttonStyles } from '@qhakaza/shared-ui';
 import { membership } from '@/content/collectors';
 
 /** `/collectors/membership` — the Founding Circle offer and its annual rhythm. */
