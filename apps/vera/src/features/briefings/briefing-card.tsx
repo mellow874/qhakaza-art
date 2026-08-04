@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { EditorialImage } from '@qhakaza/shared-ui';
 import type { Briefing } from '@/content/briefings';
+import { IMAGES } from '@/content/images';
 
 /**
  * One briefing in a grid. Used on both the home strip and the /briefings index,
@@ -20,7 +21,7 @@ export function BriefingCard({ briefing }: { briefing: Briefing }) {
         className="bg-surface relative block aspect-4/3 overflow-hidden"
       >
         <EditorialImage
-          name={`briefing-${briefing.slug}`}
+          src={IMAGES[`briefing-${briefing.slug}`]}
           alt=""
           sizes="(max-width: 640px) 100vw, 40vw"
           className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"

@@ -4,6 +4,7 @@ import { EditorialImage, buttonStyles } from '@qhakaza/shared-ui';
 import { belief, benefits, closing, experience, hero, news, preview } from '@/content/collectors';
 
 import { IntelligenceCard } from './intelligence-card';
+import { IMAGES } from '@/content/images';
 
 export function CollectorHero() {
   return (
@@ -37,7 +38,7 @@ export function CollectorHero() {
 
       <div className="relative min-h-[22rem] lg:min-h-[40rem]">
         <EditorialImage
-          name="collector-hero"
+          src={IMAGES['collector-hero']}
           alt={hero.imageAlt}
           priority
           sizes="(max-width: 1024px) 100vw, 50vw"
@@ -99,7 +100,7 @@ export function Belief() {
 
         <div className="relative aspect-4/3 w-full">
           <EditorialImage
-            name="collector-belief"
+            src={IMAGES['collector-belief']}
             alt={belief.imageAlt}
             sizes="(max-width: 1024px) 100vw, 50vw"
             className="absolute inset-0 h-full w-full object-cover"
@@ -141,7 +142,7 @@ export function FeaturedExperience() {
       <div className="border-line/70 mt-14 grid border lg:grid-cols-2">
         <div className="relative min-h-[20rem] lg:min-h-[30rem]">
           <EditorialImage
-            name="collector-experience"
+            src={IMAGES['collector-experience']}
             alt={experience.imageAlt}
             sizes="(max-width: 1024px) 100vw, 50vw"
             className="absolute inset-0 h-full w-full object-cover"

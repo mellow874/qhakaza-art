@@ -436,4 +436,23 @@ test.describe('site chrome', () => {
     );
     expect(overflows).toBe(false);
   });
+
+  test('Vera renders on the dark ground', async ({ page }) => {
+    /*
+     * The dark half of a comparison that used to live in the collector suite's
+     * test, which measured both sites in one run. Phase 2 put them in separate
+     * apps, so each now asserts its own ground: Vera dark here, the collector
+     * suite light there. Measured rather than asserted by class name, because a
+     * class assertion passes even when no token resolves.
+     */
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+    const luminance = await page.evaluate(() => {
+      const rgb = getComputedStyle(document.body).backgroundColor;
+      const [r, g, b] = rgb.match(/\d+/g)!.map(Number);
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    });
+
+    expect(luminance).toBeLessThan(40);
+  });
 });

@@ -1,31 +1,34 @@
 import Image from 'next/image';
 
-import { IMAGES } from '@/content/images';
-import { cn } from '@qhakaza/shared-ui';
+import { cn } from './cn';
 
 /**
  * A photograph that may not exist yet.
  *
- * Until the real asset is added to `content/images.ts`, this renders a tinted
- * surface of the same dimensions so the page's rhythm is correct and nothing
- * 404s. Alt text is required either way, so it is already right when the
- * photograph lands.
+ * Until the real asset is supplied, this renders a tinted surface of the same
+ * dimensions so the page's rhythm is correct and nothing 404s. Alt text is
+ * required either way, so it is already right when the photograph lands.
+ *
+ * Takes the resolved `src` rather than a key into a registry. It used to look
+ * the name up in the app's own `content/images.ts`, which meant this shared
+ * component reached back into an app — fine while there was one app, broken the
+ * moment there were three. Each app now owns its registry and passes the entry
+ * in, so the dependency points the right way.
  */
 export function EditorialImage({
-  name,
+  src,
   alt,
   priority = false,
   sizes = '100vw',
   className,
 }: {
-  name: keyof typeof IMAGES | string;
+  /** `null` when the photograph has not been supplied yet. */
+  src: string | null | undefined;
   alt: string;
   priority?: boolean;
   sizes?: string;
   className?: string;
 }) {
-  const src = IMAGES[name] ?? null;
-
   if (!src) {
     return (
       <div

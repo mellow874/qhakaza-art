@@ -28,7 +28,10 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run build && npm run start',
-    url: baseURL,
+    // Not `baseURL`: Vera took `/` in Phase 2, so this app's root is a 404 and
+    // Playwright would wait for a healthy response that never comes. Poll a
+    // route this app actually serves.
+    url: `${baseURL}/collectors`,
     // Never adopt a server this config did not start: a foreign app answering
     // on the port would otherwise be tested silently, and pass or fail for
     // reasons that have nothing to do with this codebase.

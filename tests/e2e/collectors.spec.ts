@@ -99,18 +99,18 @@ test('every call to action leads into the intake', async ({ page }) => {
   );
 });
 
-test('the suite renders light while the artist site stays dark', async ({ page }) => {
-  // Proves the token flip actually reaches the DOM, rather than only the class.
-  const luminance = async () => {
-    const rgb = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    const [r, g, b] = rgb.match(/\d+/g)!.map(Number);
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  };
-
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  const artistSite = await luminance();
-
+test('the suite renders light', async ({ page }) => {
+  /*
+   * Proves the token flip actually reaches the DOM, rather than only applying
+   * the class — a class-name assertion passes even when no token resolves.
+   *
+   * This used to measure the dark artist site in the same test, for contrast.
+   * Phase 2 moved `/` into Vera, so the two grounds now live in two apps and no
+   * single Playwright run can see both. The dark half is asserted in Vera's own
+   * suite instead; neither assertion was dropped.
+   */
   await page.goto('/collectors', { waitUntil: 'domcontentloaded' });
+
   const collectorSuite = await page.evaluate(() => {
     const el = document.querySelector('.theme-light');
     const rgb = getComputedStyle(el!).backgroundColor;
@@ -118,7 +118,6 @@ test('the suite renders light while the artist site stays dark', async ({ page }
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   });
 
-  expect(artistSite).toBeLessThan(40);
   expect(collectorSuite).toBeGreaterThan(200);
 });
 

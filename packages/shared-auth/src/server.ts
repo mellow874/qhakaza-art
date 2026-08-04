@@ -4,7 +4,7 @@ import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 
 import { prisma } from '@qhakaza/shared-db';
-import { credentialsSchema } from '@/lib/validation/user';
+import { credentialsSchema } from './credentials';
 
 import { authConfig } from './auth.config';
 

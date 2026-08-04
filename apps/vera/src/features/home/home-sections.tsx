@@ -5,6 +5,7 @@ import { SectionHeading } from '@/components/section-heading';
 import { briefings as briefingItems, homeStrip } from '@/content/briefings';
 import { artistNeeds, begin, framework, hero, platformPreview } from '@/content/home';
 import { BriefingCard } from '@/features/briefings/briefing-card';
+import { IMAGES } from '@/content/images';
 
 export function Hero() {
   return (
@@ -31,7 +32,7 @@ export function Hero() {
 
       <div className="relative min-h-[24rem] lg:min-h-[42rem]">
         <EditorialImage
-          name="hero"
+          src={IMAGES['hero']}
           alt={hero.imageAlt}
           priority
           sizes="(max-width: 1024px) 100vw, 50vw"
@@ -77,7 +78,7 @@ export function FrameworkQuote() {
   return (
     <section aria-labelledby="framework-quote" className="relative isolate overflow-hidden">
       <EditorialImage
-        name="framework"
+        src={IMAGES['framework']}
         alt={framework.imageAlt}
         className="absolute inset-0 -z-10 h-full w-full object-cover"
       />
@@ -177,7 +178,7 @@ export function Begin() {
   return (
     <section aria-labelledby="begin" className="relative isolate overflow-hidden">
       <EditorialImage
-        name="begin"
+        src={IMAGES['begin']}
         alt={begin.imageAlt}
         className="absolute inset-0 -z-10 h-full w-full object-cover"
       />

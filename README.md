@@ -136,28 +136,48 @@ Palette, type and layout rules: [docs/DESIGN.md](docs/DESIGN.md).
 
 ## Architecture
 
+**Mid-split.** The app is being separated into three independently deployable
+apps over one shared database. Vera is extracted (Phase 2); the collector and
+admin apps follow in Phases 3 and 4, and the root app is deleted in Phase 6.
+
 ```
-src/
-  app/
-    (public)/        # home, browse, art/[id], artists, artists/[slug], login, signup, forbidden
-    (artist)/artist/       # ARTIST only
-    (collector)/collector/ # COLLECTOR only
-    (admin)/admin/         # ADMIN only
-    api/auth/[...nextauth]/
-  components/        # shared, domain-agnostic UI
-  features/<domain>/ # domain components + server actions + co-located tests
-  lib/
-    auth/            # rbac rules, edge-safe config, full server config
-    validation/      # Zod schemas shared by client forms and server actions
-    db.ts            # Prisma singleton
-  types/             # module augmentation (session carries `role`)
-prisma/              # schema, migrations, seed
-tests/e2e/           # Playwright
+apps/
+  vera/              # ✅ public artist website — port 3001, E2E on 4320
+    src/app/         #    (public) marketing + (artist) area + api/auth
+    src/{components,content,features,lib,types}
+    tests/e2e/       #    its own Playwright suite
+  collector/         # ⏳ Phase 3 — invite-only concierge, /private/<token>
+  command-center/    # ⏳ Phase 4 — AdminCommandCenter
+
+packages/
+  shared-db/         # the ONLY database client; 13 entities; RLS declarations
+    prisma/          #   schema, migrations, seed
+  shared-auth/       # roles, rbac, requireRole(), requireToken(), credentials
+  shared-ui/         # Button, Field, EditorialImage, cn — used by 2+ apps only
+
+src/                 # ⏳ what has not been extracted yet: the collector
+                     #    marketing tree plus the /admin and /collector stubs.
+                     #    Deleted in Phase 6. E2E on 4319.
 ```
 
-**Route groups** map one-to-one onto the three roles. The group name is not part
-of the URL, so `(artist)/artist/dashboard` serves `/artist/dashboard` while
-keeping each role's layout, navigation and access rules in their own tree.
+Each app owns its entry point, router, `next.config.ts`, `tsconfig.json`,
+Playwright config and env file, and reaches the database **only** through
+`@qhakaza/shared-db`. No app defines its own connection.
+
+**Route groups** map onto roles. The group name is not part of the URL, so
+`(artist)/artist/dashboard` serves `/artist/dashboard` while keeping each role's
+layout, navigation and access rules in their own tree.
+
+### Running it
+
+| Command                  | Does                                    |
+| ------------------------ | --------------------------------------- |
+| `npm run vera`           | Vera dev server on :3001                |
+| `npm run dev`            | The not-yet-extracted app on :3000      |
+| `npm run test:workspace` | Unit + integration across root and Vera |
+| `npm run e2e:workspace`  | Both Playwright suites                  |
+
+Each app can also be driven directly: `npm test --workspace @qhakaza/vera`.
 
 **`features/<domain>/`** keeps a domain's UI, server actions and tests together.
 `components/` is only for genuinely shared, domain-free UI. This is what stops

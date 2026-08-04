@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { artistProfileSchema, credentialsSchema, signUpSchema } from './user';
+import { artistProfileSchema, signUpSchema } from './user';
 
 describe('signUpSchema', () => {
   const valid = {
@@ -35,18 +35,6 @@ describe('signUpSchema', () => {
   it('defaults the role to COLLECTOR', () => {
     const { role: _role, ...withoutRole } = valid;
     expect(signUpSchema.parse(withoutRole).role).toBe('COLLECTOR');
-  });
-});
-
-describe('credentialsSchema', () => {
-  it('accepts an email and password pair', () => {
-    expect(credentialsSchema.safeParse({ email: 'a@b.com', password: 'password1' }).success).toBe(
-      true,
-    );
-  });
-
-  it('rejects a missing password', () => {
-    expect(credentialsSchema.safeParse({ email: 'a@b.com' }).success).toBe(false);
   });
 });
 

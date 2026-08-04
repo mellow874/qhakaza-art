@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
 import { Button, Field } from '@qhakaza/shared-ui';
-import { credentialsSchema } from '@/lib/validation/user';
+import { credentialsSchema } from '@qhakaza/shared-auth';
 
 type Props = {
   callbackUrl?: string;

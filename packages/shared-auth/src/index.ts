@@ -14,3 +14,4 @@
 
 export * from './rbac';
 export * from './access';
+export * from './credentials';

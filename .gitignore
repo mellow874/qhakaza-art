@@ -13,9 +13,11 @@
 # testing
 /coverage
 
-# next.js
+# next.js (root app and every app under apps/)
 /.next/
 /.next-e2e/
+apps/*/.next/
+apps/*/.next-e2e/
 /out/
 
 # production
@@ -40,6 +42,8 @@ yarn-error.log*
 
 # playwright
 /test-results
+apps/*/test-results
+apps/*/playwright-report
 /playwright-report
 /blob-report
 /playwright/.cache

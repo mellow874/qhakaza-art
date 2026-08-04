@@ -20,10 +20,8 @@ export const signUpSchema = z.object({
   role: z.enum(SIGNUP_ROLES).default('COLLECTOR'),
 });
 
-export const credentialsSchema = z.object({
-  email: emailSchema,
-  password: z.string().min(1, 'Password is required'),
-});
+// `credentialsSchema` lives in @qhakaza/shared-auth: all three apps sign in
+// against the same accounts, so one definition serves client and server alike.
 
 export const artistProfileSchema = z.object({
   displayName: z.string().trim().min(1, 'Display name is required').max(120),
@@ -47,6 +45,5 @@ export const contactMessageSchema = z.object({
 export type ContactMessageInput = z.infer<typeof contactMessageSchema>;
 
 export type SignUpInput = z.infer<typeof signUpSchema>;
-export type CredentialsInput = z.infer<typeof credentialsSchema>;
 export type ArtistProfileInput = z.infer<typeof artistProfileSchema>;
 export type CollectorProfileInput = z.infer<typeof collectorProfileSchema>;

@@ -6,7 +6,6 @@ import prettier from 'eslint-config-prettier';
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // Turns off stylistic rules that Prettier owns.
   prettier,
   {
     rules: {
@@ -25,19 +24,7 @@ const eslintConfig = defineConfig([
       '@typescript-eslint/no-empty-object-type': 'off',
     },
   },
-  globalIgnores([
-    'apps/**',
-    '.next/**',
-    // The E2E suite's production build (NEXT_DIST_DIR), kept out of `.next` so
-    // it cannot invalidate a running dev server.
-    '.next-e2e/**',
-    'out/**',
-    'build/**',
-    'coverage/**',
-    'playwright-report/**',
-    'test-results/**',
-    'next-env.d.ts',
-  ]),
+  globalIgnores(['.next/**', '.next-e2e/**', 'out/**', 'next-env.d.ts']),
 ]);
 
 export default eslintConfig;

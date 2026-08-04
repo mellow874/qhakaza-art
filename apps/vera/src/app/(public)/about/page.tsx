@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { CtaBand } from '@/components/cta-band';
 import { EditorialImage } from '@qhakaza/shared-ui';
 import { cta, documents, hero, position } from '@/content/about';
+import { IMAGES } from '@/content/images';
 
 export const metadata: Metadata = {
   title: 'About',
@@ -60,7 +61,7 @@ export default function AboutPage() {
       {/* Full-bleed band. The documents carry meaning, so the alt text is descriptive. */}
       <div className="relative h-[22rem] w-full sm:h-[30rem]">
         <EditorialImage
-          name="aboutDocuments"
+          src={IMAGES['aboutDocuments']}
           alt={documents.imageAlt}
           sizes="100vw"
           className="absolute inset-0 h-full w-full object-cover"
