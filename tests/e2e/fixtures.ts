@@ -1,0 +1,138 @@
+import { PrismaClient, type Role } from '@prisma/client';
+import { expect, test as base, type Page } from '@playwright/test';
+import bcrypt from 'bcryptjs';
+import { config } from 'dotenv';
+
+// Playwright does not load .env, so DATABASE_URL is set explicitly rather than
+// relying on Prisma picking it up implicitly.
+config({ path: '.env', quiet: true });
+
+/**
+ * Per-test accounts.
+ *
+ * E2E tests used to sign in as the same seeded artist, which meant any test
+ * that wrote to that row could break a test reading it — fine serially, racy in
+ * parallel. Each test now gets its own freshly created user, torn down
+ * afterwards, so they are independent and can run at full concurrency.
+ *
+ * This talks to the same database the app under test uses (DATABASE_URL).
+ */
+const prisma = new PrismaClient();
+
+export const PASSWORD = 'password123';
+
+export type Account = {
+  id: string;
+  email: string;
+  password: string;
+};
+
+let counter = 0;
+
+function uniqueEmail(role: Role) {
+  counter += 1;
+  return `e2e-${role.toLowerCase()}-${process.pid}-${counter}@test.local`;
+}
+
+async function createAccount(role: Role, withProfile: { displayName: string } | null = null) {
+  const email = uniqueEmail(role);
+
+  const user = await prisma.user.create({
+    data: {
+      name: withProfile?.displayName ?? `E2E ${role}`,
+      email,
+      role,
+      passwordHash: await bcrypt.hash(PASSWORD, 10),
+      ...(withProfile
+        ? {
+            artistProfile: {
+              create: {
+                displayName: withProfile.displayName,
+                slug: `e2e-${process.pid}-${counter}`,
+                approved: true,
+              },
+            },
+          }
+        : {}),
+    },
+  });
+
+  return { id: user.id, email, password: PASSWORD };
+}
+
+async function destroyAccount(account: Account) {
+  // Cascades clear the artist profile and anything hanging off it.
+  await prisma.user.deleteMany({ where: { id: account.id } });
+}
+
+export const test = base.extend<{
+  artist: Account;
+  artistWithProfile: Account;
+  collector: Account;
+}>({
+  artist: async ({}, use) => {
+    const account = await createAccount('ARTIST');
+    await use(account);
+    await destroyAccount(account);
+  },
+
+  artistWithProfile: async ({}, use) => {
+    const account = await createAccount('ARTIST', { displayName: 'Thandi Mokoena' });
+    await use(account);
+    await destroyAccount(account);
+  },
+
+  collector: async ({}, use) => {
+    const account = await createAccount('COLLECTOR');
+    await use(account);
+    await destroyAccount(account);
+  },
+});
+
+export { expect } from '@playwright/test';
+
+/**
+ * On a narrow viewport the header's links live behind a menu toggle. Opening it
+ * when present lets one test cover both layouts, rather than asserting only what
+ * the desktop happens to show.
+ */
+export async function openNavIfCollapsed(page: Page) {
+  const toggle = page.getByRole('button', { name: 'Open menu' });
+  if (!(await toggle.isVisible())) return;
+
+  /*
+   * The header is a client component, and these tests navigate with
+   * `domcontentloaded` rather than waiting for full load — so a click can land
+   * before React has attached its handler and simply do nothing. Retry until
+   * the menu is genuinely open rather than assuming the first click took.
+   */
+  await expect(async () => {
+    if (await toggle.isVisible()) await toggle.click();
+    await expect(page.getByRole('button', { name: 'Close menu' })).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 20_000 });
+}
+
+/**
+ * Waits until React has hydrated the form on the page.
+ *
+ * These tests navigate with `domcontentloaded`, so the server-rendered inputs
+ * are present and fillable before React mounts. A **controlled** input filled in
+ * that window is silently reset to its initial state the moment hydration runs —
+ * the test then submits an empty field and fails somewhere far from the cause.
+ *
+ * Detected by the fiber React attaches to the DOM node on hydration. That is an
+ * internal, but it is the only honest signal that the handlers are live; the
+ * alternative is a sleep.
+ */
+export async function waitForFormHydration(page: Page) {
+  await page.waitForFunction(() => {
+    const form = document.querySelector('form');
+    return Boolean(form) && Object.keys(form!).some((key) => key.startsWith('__react'));
+  });
+}
+
+export async function signIn(page: Page, account: { email: string; password: string }) {
+  await page.getByLabel('Email').fill(account.email);
+  await page.getByLabel('Password').fill(account.password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+}

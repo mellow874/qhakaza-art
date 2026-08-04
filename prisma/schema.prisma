@@ -1,0 +1,222 @@
+// Qhakaza Art — data model
+// Phase 0 baseline. Refined (with a proper migration) as each phase lands.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ARTIST
+  COLLECTOR
+  ADMIN
+}
+
+enum ArtStatus {
+  DRAFT
+  LISTED
+  SOLD
+  HIDDEN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  CANCELLED
+  REFUNDED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  role          Role      @default(COLLECTOR)
+  avatar        String?
+  bio           String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  artistProfile ArtistProfile?
+  orders        Order[]
+  favorites     Favorite[]
+  accounts      Account[]
+  sessions      Session[]
+
+  @@index([role])
+}
+
+model ArtistProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  displayName String
+  slug        String   @unique
+  statement   String?
+  socials     Json?
+  approved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artPieces ArtPiece[]
+
+  @@index([approved])
+}
+
+model ArtPiece {
+  id          String    @id @default(cuid())
+  artistId    String
+  title       String
+  description String
+  images      String[]
+  medium      String
+  dimensions  String
+  price       Decimal   @db.Decimal(12, 2)
+  currency    String    @default("ZAR")
+  status      ArtStatus @default(DRAFT)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  artist    ArtistProfile @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  orders    Order[]
+  favorites Favorite[]
+
+  @@index([artistId])
+  @@index([status])
+  @@index([medium])
+}
+
+model Order {
+  id                    String      @id @default(cuid())
+  artPieceId            String
+  collectorId           String
+  amount                Decimal     @db.Decimal(12, 2)
+  currency              String      @default("ZAR")
+  status                OrderStatus @default(PENDING)
+  stripePaymentIntentId String?     @unique
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  artPiece  ArtPiece @relation(fields: [artPieceId], references: [id])
+  collector User     @relation(fields: [collectorId], references: [id])
+
+  @@index([collectorId])
+  @@index([artPieceId])
+  @@index([status])
+}
+
+model Favorite {
+  collectorId String
+  artPieceId  String
+  createdAt   DateTime @default(now())
+
+  collector User     @relation(fields: [collectorId], references: [id], onDelete: Cascade)
+  artPiece  ArtPiece @relation(fields: [artPieceId], references: [id], onDelete: Cascade)
+
+  @@id([collectorId, artPieceId])
+  @@index([collectorId])
+}
+
+/// Contact form submissions.
+///
+/// Persisted rather than emailed: there is no mail provider configured yet, and
+/// a form that silently discards messages is worse than no form. Wire up
+/// delivery (and notification) when a provider is chosen.
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String
+  message   String
+  handled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([handled, createdAt])
+}
+
+enum CollectorApplicationStatus {
+  /// The intake form has been completed. The verification step the form's own
+  /// button promises ("Continue to verification") is not built yet, so every
+  /// application currently rests here.
+  AWAITING_VERIFICATION
+  UNDER_REVIEW
+  ACCEPTED
+  DECLINED
+}
+
+/// Collector Intelligence Suite membership applications.
+///
+/// Not linked to `User`: the intake is completed by anonymous visitors, before
+/// any account exists. Add the relation when the signed-in collector area lands
+/// and an application needs to be claimed by an account.
+///
+/// This table holds **sensitive personal and financial information** — income
+/// and liquid-asset bands, contact details, free-text about someone's wealth and
+/// intentions. Everything but name and email is optional by design. Treat any
+/// screen that reads this table as privileged, and do not log rows.
+model CollectorApplication {
+  id     String @id @default(cuid())
+  status CollectorApplicationStatus @default(AWAITING_VERIFICATION)
+
+  fullName String
+  email    String
+  phone    String?
+  country  String?
+  city     String?
+
+  annualIncomeBand String?
+  liquidAssetsBand String?
+
+  collectingGoal String?
+  artExposure    String?
+  /// Free-form rather than an enum: the medium list is marketing copy that will
+  /// change without a migration, and a stale enum would reject a live option.
+  preferredMediums String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email])
+}
+
+// --- Auth.js adapter models ---
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
