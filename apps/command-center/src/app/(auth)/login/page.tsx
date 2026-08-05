@@ -28,7 +28,11 @@ export default async function LoginPage({
     <div className="theme-light bg-canvas text-body min-h-svh">
       <NarrowPage className="max-w-md">
         <PageHeader eyebrow="Command Center" title="Staff sign in" className="mb-10" />
-        <LoginForm callbackUrl={safeCallbackUrl} />
+        {/* Server-side: only offer Google when it is actually configured. */}
+        <LoginForm
+          callbackUrl={safeCallbackUrl}
+          googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID)}
+        />
         {/* No "create an account" link, deliberately. Admin and advisor accounts
             are granted from inside this console by an existing administrator —
             a console that lets anyone enrol themselves as staff is not a
