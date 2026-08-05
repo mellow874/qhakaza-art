@@ -24,10 +24,6 @@ export const FOOTER_COLUMNS = [
       { href: '/briefings', label: 'Briefings' },
       { href: '/faq', label: 'FAQ' },
       { href: '/contact', label: 'Contact' },
-      // Not in any supplied design. Added because nothing else on the artist
-      // site reaches the collector sub-brand — it was only findable by typing
-      // the URL. Remove if the two are meant to stay unlinked in public.
-      { href: '/collectors', label: 'Collector Intelligence Suite' },
     ],
   },
   {

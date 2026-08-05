@@ -5,8 +5,8 @@ import { LoginForm } from '@/features/auth/login-form';
 
 export const metadata: Metadata = {
   title: 'Sign in',
-  // Members reach this only from an invitation link. There is nothing here for
-  // a search engine, and an indexed sign-in page invites credential stuffing.
+  // An operations console has nothing for a search engine, and an indexed
+  // sign-in page invites credential stuffing.
   robots: { index: false, follow: false },
 };
 
@@ -27,11 +27,15 @@ export default async function LoginPage({
   return (
     <div className="theme-light bg-canvas text-body min-h-svh">
       <NarrowPage className="max-w-md">
-        <PageHeader eyebrow="Private access" title="Sign in" className="mb-10" />
+        <PageHeader eyebrow="Command Center" title="Staff sign in" className="mb-10" />
         <LoginForm callbackUrl={safeCallbackUrl} />
+        {/* No "create an account" link, deliberately. Admin and advisor accounts
+            are granted from inside this console by an existing administrator —
+            a console that lets anyone enrol themselves as staff is not a
+            console. */}
         <p className="text-muted mt-10 text-sm">
-          Access to the member area is by invitation. If you do not have an account, speak to your
-          advisor.
+          Admin and advisor accounts are granted from inside the Command Center. If you need access,
+          ask an administrator to change your role.
         </p>
       </NarrowPage>
     </div>

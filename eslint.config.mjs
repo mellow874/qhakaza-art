@@ -10,6 +10,10 @@ const eslintConfig = defineConfig([
   prettier,
   {
     rules: {
+      // The workspace root is no longer a Next application -- it lints the
+      // shared packages and scripts. This rule looks for a pages/ directory
+      // that will never exist here and warns on every run.
+      '@next/next/no-html-link-for-pages': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
@@ -28,9 +32,6 @@ const eslintConfig = defineConfig([
   globalIgnores([
     'apps/**',
     '.next/**',
-    // The E2E suite's production build (NEXT_DIST_DIR), kept out of `.next` so
-    // it cannot invalidate a running dev server.
-    '.next-e2e/**',
     'out/**',
     'build/**',
     'coverage/**',

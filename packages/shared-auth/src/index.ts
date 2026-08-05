@@ -12,6 +12,10 @@
  * browser bundle, so they are reached by explicit subpath instead.
  */
 
+// Side-effect import: teaches next-auth about our role on the session for
+// every consumer of this package, rather than each app redeclaring it.
+import './next-auth-types';
+
 export * from './rbac';
 export * from './access';
 export * from './credentials';

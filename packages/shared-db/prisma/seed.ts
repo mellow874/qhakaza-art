@@ -1,7 +1,16 @@
 import { ArtStatus, OrderStatus, PrismaClient, Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
-const prisma = new PrismaClient();
+/**
+ * Seeds as the database OWNER, not as the app role.
+ *
+ * Creating artists and artworks is privileged work: RLS correctly forbids an
+ * anonymous app connection from doing it. Seeding is out-of-band setup, so it
+ * uses `DIRECT_DATABASE_URL` — the same connection migrations run on.
+ */
+const prisma = new PrismaClient({
+  datasourceUrl: process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL,
+});
 
 /** Every seeded account shares this password — local development only. */
 const SEED_PASSWORD = 'password123';
@@ -27,6 +36,19 @@ async function main() {
       role: Role.ADMIN,
       passwordHash,
       bio: 'Platform administrator.',
+    },
+  });
+
+  // An advisor as well as an admin: the two Command Center roles differ (an
+  // advisor vets and invites but cannot change permissions), and that is only
+  // demonstrable with an account for each.
+  await prisma.user.create({
+    data: {
+      name: 'Kagiso Molefe',
+      email: 'advisor@qhakaza.art',
+      role: Role.ADVISOR,
+      passwordHash,
+      bio: 'Collector advisor.',
     },
   });
 
@@ -209,6 +231,7 @@ async function main() {
 
   console.log('Seeded:');
   console.log(`  1 admin       ${admin.email}`);
+  console.log('  1 advisor     advisor@qhakaza.art');
   console.log(`  2 artists     ${thandi.email}, ${sipho.email} (sipho awaits approval)`);
   console.log(`  3 collectors  ${collectors.map((c) => c.email).join(', ')}`);
   console.log(`  ${created.length} art pieces, 1 paid order, 3 favourites`);

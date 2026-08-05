@@ -19,7 +19,6 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
       "@tests/*": ["./tests/*"],
       "@qhakaza/shared-db": ["./packages/shared-db/src/index.ts"],
       "@qhakaza/shared-auth": ["./packages/shared-auth/src/index.ts"],
@@ -27,15 +26,6 @@
       "@qhakaza/shared-ui": ["./packages/shared-ui/src/index.ts"]
     }
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    "**/*.mts",
-    ".next-e2e/types/**/*.ts",
-    ".next-e2e/dev/types/**/*.ts"
-  ],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.mts"],
   "exclude": ["node_modules", "apps"]
 }

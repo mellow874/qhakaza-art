@@ -49,6 +49,14 @@ export default defineConfig({
           name: 'unit',
           environment: 'jsdom',
           globals: true,
+          /*
+           * Well above the 5s default. These are plain jsdom renders, but a
+           * userEvent-driven form test lands at 5-7s when several suites run
+           * back to back on one machine -- so the default was failing on
+           * contention, not on anything the code did. Timing out at 15s still
+           * catches a genuine hang.
+           */
+          testTimeout: 15_000,
           setupFiles: ['./vitest.setup.ts'],
           include: ['src/**/*.{test,spec}.{ts,tsx}', 'packages/*/src/**/*.{test,spec}.{ts,tsx}'],
           exclude: ['**/*.db.test.ts', 'node_modules', '.next', 'tests/e2e'],

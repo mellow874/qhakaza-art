@@ -30,9 +30,11 @@ export const authConfig = {
      * copied onto the token at sign-in and read back out on every request.
      */
     jwt({ token, user }) {
-      if (user && isRole((user as { role?: unknown }).role)) {
-        token.role = (user as { role: string }).role;
-      }
+      // Narrowed once and reused, rather than checking with `isRole` and then
+      // re-casting to `string` — which threw the guard's result away and let an
+      // arbitrary string onto the token.
+      const role: unknown = user ? (user as { role?: unknown }).role : undefined;
+      if (isRole(role)) token.role = role;
       return token;
     },
     session({ session, token }) {
