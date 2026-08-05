@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 
-import { prisma } from '@qhakaza/shared-db';
-
-import { expect, signIn, test, waitForFormHydration } from './fixtures';
+// The privileged client: seeding invitations is something RLS correctly
+// forbids the app connection from doing.
+import { expect, prisma, signIn, test, waitForFormHydration } from './fixtures';
 
 /**
  * `/private/<token>` — the invite-only concierge area.

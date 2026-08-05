@@ -26,7 +26,12 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // Applications connect as `qhakaza_app`: not the owner, not a superuser, no
+  // BYPASSRLS. This is what makes the policies bite.
+  url       = env("DATABASE_URL")
+  // Migrations connect as the owner, which correctly bypasses RLS -- the app
+  // role has no rights to ALTER anything.
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // ---------------------------------------------------------------------------

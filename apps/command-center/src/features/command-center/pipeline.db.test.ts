@@ -118,7 +118,7 @@ describe('artist -> admin -> collector -> admin', () => {
     });
 
     // 6. It arrives in the Command Center, attached to the artist behind it.
-    const comms = await getCommunications();
+    const comms = await getCommunications({ userId: ADMIN, role: 'ADMIN' });
     expect(comms.notes).toHaveLength(1);
     expect(comms.notes[0].artwork?.title).toBe('Quiet Inheritance');
     expect(comms.notes[0].artwork?.artist.displayName).toBe('Thandi Mokoena');

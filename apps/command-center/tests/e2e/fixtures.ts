@@ -7,8 +7,21 @@ import 'dotenv/config';
 import { expect, test as base, type Page } from '@playwright/test';
 import bcrypt from 'bcryptjs';
 
+import { PrismaClient } from '@prisma/client';
+
 import { type Role } from '@qhakaza/shared-auth';
-import { prisma } from '@qhakaza/shared-db';
+
+/**
+ * Test fixtures connect as the database OWNER, not as the app role.
+ *
+ * Seeding is privileged work: creating an artist or an invitation is something
+ * RLS correctly forbids an anonymous app connection from doing. The app under
+ * test still runs constrained — that is the point — so this client exists only
+ * to arrange and tear down the world around it.
+ */
+export const prisma = new PrismaClient({
+  datasourceUrl: process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL,
+});
 
 /**
  * Per-test accounts.

@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 
 import { requireRole, type Session } from '@qhakaza/shared-auth/guards';
 import { COMMAND_CENTER_ROLES } from '@qhakaza/shared-auth';
-import { prisma } from '@qhakaza/shared-db';
+import { prisma, setActor, withActor } from '@qhakaza/shared-db';
 import type { Prisma } from '@prisma/client';
 
 /**
@@ -33,6 +33,29 @@ export function isFailure(value: AuditActor | AdminFailure): value is AdminFailu
   return 'ok' in value && value.ok === false;
 }
 
+/** The Command Center's roles, in the lower-case form the RLS policies read. */
+export function actorContext(actor: AuditActor) {
+  return {
+    role: actor.role === 'ADMIN' ? ('admin' as const) : ('advisor' as const),
+    userId: actor.userId,
+  };
+}
+
+/**
+ * A read performed as the acting member of staff.
+ *
+ * Every query in this app goes through here. Without it the query runs
+ * anonymous, and the collector tables — which grant nothing to `public` —
+ * simply return empty. That failure mode is quiet, which is exactly why the
+ * helper exists rather than a convention.
+ */
+export function readAs<T>(
+  actor: AuditActor,
+  run: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  return withActor(actorContext(actor), run);
+}
+
 type Audited<T> = {
   actor: AuditActor;
   action: string;
@@ -51,6 +74,10 @@ export async function performAudited<T>(input: Audited<T>): Promise<T> {
   const ipAddress = headerList.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
 
   return prisma.$transaction(async (tx) => {
+    // Declared on the transaction this function already opens: Prisma has no
+    // nested interactive transactions, so `withActor` cannot be used here.
+    await setActor(tx, actorContext(input.actor));
+
     const result = await input.run(tx);
 
     await tx.auditLog.create({

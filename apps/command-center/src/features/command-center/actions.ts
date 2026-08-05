@@ -6,9 +6,14 @@ import { revalidatePath } from 'next/cache';
 
 import { fingerprintToken } from '@qhakaza/shared-auth/guards';
 import { auth } from '@qhakaza/shared-auth/server';
-import { prisma } from '@qhakaza/shared-db';
 
-import { commandCentreActor, isFailure, performAudited, type AdminFailure } from '@/lib/audit';
+import {
+  commandCentreActor,
+  isFailure,
+  performAudited,
+  readAs,
+  type AdminFailure,
+} from '@/lib/audit';
 
 /**
  * Command Center actions — the only bridge between the two sites.
@@ -31,10 +36,12 @@ export async function setArtistApproval(input: {
   const actor = commandCentreActor(await auth());
   if (isFailure(actor)) return actor;
 
-  const artist = await prisma.artist.findUnique({
-    where: { id: input.artistId },
-    select: { id: true, displayName: true, approved: true },
-  });
+  const artist = await readAs(actor, (tx) =>
+    tx.artist.findUnique({
+      where: { id: input.artistId },
+      select: { id: true, displayName: true, approved: true },
+    }),
+  );
   if (!artist) return { ok: false, error: 'NOT_FOUND' };
 
   try {
@@ -73,10 +80,12 @@ export async function setArtworkRelease(input: {
   const actor = commandCentreActor(await auth());
   if (isFailure(actor)) return actor;
 
-  const artwork = await prisma.artwork.findUnique({
-    where: { id: input.artworkId },
-    select: { id: true, title: true, status: true, artist: { select: { approved: true } } },
-  });
+  const artwork = await readAs(actor, (tx) =>
+    tx.artwork.findUnique({
+      where: { id: input.artworkId },
+      select: { id: true, title: true, status: true, artist: { select: { approved: true } } },
+    }),
+  );
   if (!artwork) return { ok: false, error: 'NOT_FOUND' };
 
   // Releasing work by an unvetted artist would put a raw submission in front of
@@ -114,10 +123,12 @@ export async function decideCollectorIntake(input: {
   const actor = commandCentreActor(await auth());
   if (isFailure(actor)) return actor;
 
-  const intake = await prisma.collectorIntake.findUnique({
-    where: { id: input.intakeId },
-    select: { id: true, fullName: true, status: true },
-  });
+  const intake = await readAs(actor, (tx) =>
+    tx.collectorIntake.findUnique({
+      where: { id: input.intakeId },
+      select: { id: true, fullName: true, status: true },
+    }),
+  );
   if (!intake) return { ok: false, error: 'NOT_FOUND' };
 
   const nextStatus = input.outcome === 'VERIFIED' ? 'ACCEPTED' : 'DECLINED';
@@ -180,10 +191,17 @@ export async function inviteCollector(input: {
   const actor = commandCentreActor(await auth());
   if (isFailure(actor)) return actor;
 
-  const intake = await prisma.collectorIntake.findUnique({
-    where: { id: input.intakeId },
-    select: { id: true, email: true, fullName: true, verification: { select: { outcome: true } } },
-  });
+  const intake = await readAs(actor, (tx) =>
+    tx.collectorIntake.findUnique({
+      where: { id: input.intakeId },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        verification: { select: { outcome: true } },
+      },
+    }),
+  );
   if (!intake) return { ok: false, error: 'NOT_FOUND' };
 
   // Invitation follows verification. Inviting an unvetted applicant would make
@@ -238,10 +256,12 @@ export async function revokeInvitation(input: { invitationId: string }): Promise
   const actor = commandCentreActor(await auth());
   if (isFailure(actor)) return actor;
 
-  const invitation = await prisma.memberInvitation.findUnique({
-    where: { id: input.invitationId },
-    select: { id: true, email: true, status: true },
-  });
+  const invitation = await readAs(actor, (tx) =>
+    tx.memberInvitation.findUnique({
+      where: { id: input.invitationId },
+      select: { id: true, email: true, status: true },
+    }),
+  );
   if (!invitation) return { ok: false, error: 'NOT_FOUND' };
 
   try {
@@ -283,10 +303,12 @@ export async function setUserRole(input: {
     return { ok: false, error: 'INVALID' };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: input.userId },
-    select: { id: true, email: true, role: true },
-  });
+  const user = await readAs(actor, (tx) =>
+    tx.user.findUnique({
+      where: { id: input.userId },
+      select: { id: true, email: true, role: true },
+    }),
+  );
   if (!user) return { ok: false, error: 'NOT_FOUND' };
 
   try {
@@ -317,10 +339,12 @@ export async function setNoteStatus(input: {
   const actor = commandCentreActor(await auth());
   if (isFailure(actor)) return actor;
 
-  const note = await prisma.privateNoteSubmission.findUnique({
-    where: { id: input.noteId },
-    select: { id: true, subject: true, status: true },
-  });
+  const note = await readAs(actor, (tx) =>
+    tx.privateNoteSubmission.findUnique({
+      where: { id: input.noteId },
+      select: { id: true, subject: true, status: true },
+    }),
+  );
   if (!note) return { ok: false, error: 'NOT_FOUND' };
 
   try {

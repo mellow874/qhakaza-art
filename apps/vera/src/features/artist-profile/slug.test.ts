@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { slugify, uniqueSlug } from './slug';
+import { slugCandidates, slugify } from './slug';
 
 describe('slugify', () => {
   it('lowercases and hyphenates', () => {
@@ -33,25 +33,25 @@ describe('slugify', () => {
   });
 });
 
-describe('uniqueSlug', () => {
-  it('returns the base slug when it is free', async () => {
-    const result = await uniqueSlug('Thandi Mokoena', async () => false);
-    expect(result).toBe('thandi-mokoena');
+describe('slugCandidates', () => {
+  it('offers the plain slug first', () => {
+    expect(slugCandidates('Thandi Mokoena')[0]).toBe('thandi-mokoena');
   });
 
-  it('appends a counter until it finds a free slug', async () => {
-    const taken = new Set(['thandi-mokoena', 'thandi-mokoena-2']);
-    const result = await uniqueSlug('Thandi Mokoena', async (slug) => taken.has(slug));
-    expect(result).toBe('thandi-mokoena-3');
+  it('then counts upwards from two', () => {
+    expect(slugCandidates('Studio 54').slice(0, 3)).toEqual([
+      'studio-54',
+      'studio-54-2',
+      'studio-54-3',
+    ]);
   });
 
-  it('asks about the base slug first', async () => {
-    const asked: string[] = [];
-    await uniqueSlug('Studio 54', async (slug) => {
-      asked.push(slug);
-      return asked.length < 2;
-    });
-    expect(asked[0]).toBe('studio-54');
-    expect(asked[1]).toBe('studio-54-2');
+  it('is bounded, so a pathological name cannot spin forever', () => {
+    expect(slugCandidates('Thandi Mokoena', 5)).toHaveLength(5);
+  });
+
+  it('never repeats a candidate', () => {
+    const candidates = slugCandidates('Thandi Mokoena');
+    expect(new Set(candidates).size).toBe(candidates.length);
   });
 });

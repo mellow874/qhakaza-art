@@ -16,24 +16,20 @@ export function slugify(input: string): string {
 }
 
 /**
- * Finds a free slug, trying `base`, `base-2`, `base-3`… in turn.
+ * The slugs to try, in order: `base`, `base-2`, `base-3`…
  *
- * `isTaken` is injected rather than querying directly, which keeps this
- * testable without a database and lets callers scope the check (e.g. excluding
- * the artist's own current slug).
+ * The caller attempts the insert with each in turn and moves on when the unique
+ * constraint rejects it. That replaces an earlier "ask whether it is taken, then
+ * insert" version, which was wrong in two ways:
+ *
+ *  - **Racy.** Two artists onboarding at the same moment could both be told a
+ *    slug was free and both try to take it.
+ *  - **Blind under RLS.** An artist may only read their own row, so the check
+ *    reported every other artist's slug as free.
+ *
+ * The unique index is the only thing that actually knows, so it is what decides.
  */
-export async function uniqueSlug(
-  displayName: string,
-  isTaken: (slug: string) => Promise<boolean>,
-): Promise<string> {
+export function slugCandidates(displayName: string, limit = 25): string[] {
   const base = slugify(displayName);
-
-  if (!(await isTaken(base))) return base;
-
-  for (let suffix = 2; suffix < 1_000; suffix += 1) {
-    const candidate = `${base}-${suffix}`;
-    if (!(await isTaken(candidate))) return candidate;
-  }
-
-  throw new Error(`Could not find a free slug for "${displayName}"`);
+  return [base, ...Array.from({ length: limit - 1 }, (_, index) => `${base}-${index + 2}`)];
 }

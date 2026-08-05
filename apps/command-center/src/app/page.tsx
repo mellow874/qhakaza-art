@@ -41,13 +41,16 @@ export default async function CommandCenterPage() {
     );
   }
 
+  // The acting member of staff, in the shape the queries and RLS both expect.
+  const actor = { userId: grant.userId, role: grant.role as 'ADMIN' | 'ADVISOR' };
+
   const [vetting, intakes, comms, analytics, people, audit] = await Promise.all([
-    getVettingQueue(),
-    getIntakeQueue(),
-    getCommunications(),
-    getAnalytics(),
-    getPeople(),
-    getAuditTrail(),
+    getVettingQueue(actor),
+    getIntakeQueue(actor),
+    getCommunications(actor),
+    getAnalytics(actor),
+    getPeople(actor),
+    getAuditTrail(actor),
   ]);
 
   return (

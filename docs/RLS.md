@@ -8,58 +8,48 @@ than drifting quietly.
 
 **52 policies across the 13 core entities. 30 adversarial tests.**
 
-## ⚠ Current status: proven, not yet protecting production
+## Status: enforced
 
-|                                                                     | State                  |
-| ------------------------------------------------------------------- | ---------------------- |
-| Policies applied to dev and test databases                          | ✅                     |
-| `qhakaza_app` role exists — NOSUPERUSER, NOBYPASSRLS, not the owner | ✅                     |
-| Adversarial tests pass against that constrained role                | ✅ 30/30               |
-| **Apps connect as that role**                                       | ❌ **still `qhakaza`** |
+|                                                              | State                            |
+| ------------------------------------------------------------ | -------------------------------- |
+| Policies applied to dev and test databases                   | ✅                               |
+| `qhakaza_app` role — NOSUPERUSER, NOBYPASSRLS, not the owner | ✅                               |
+| Adversarial tests pass against that constrained role         | ✅ 30/30                         |
+| **All three apps connect as that role**                      | ✅                               |
+| Full regression under the constrained role                   | ✅ 323 unit/integration, 226 E2E |
 
-`qhakaza` is a superuser **and holds BYPASSRLS**, so for the running apps the
-policies are currently inert. They are real and enforced for any connection made
-as `qhakaza_app` — which is what the test suite proves — but the applications
-have not been cut over.
+The apps connect as `qhakaza_app`. Migrations use `DIRECT_DATABASE_URL` (the
+owner), which correctly bypasses RLS — the app role has no rights to `ALTER`
+anything.
 
-**This is the honest gap.** RLS that is enabled but bypassed by the connecting
-role is the single most dangerous state available: it looks finished. It is
-recorded here rather than quietly claimed as done.
+Confirmed live against the dev database after cutover: the app connection
+reports `superuser: false, bypassrls: false`, sees **3 of 10** artworks (only
+released ones) and **0 of 17** collector intakes.
 
-## The cutover
+## Where each actor is declared
 
-One environment change per app:
+| Path                                     | Actor                              |
+| ---------------------------------------- | ---------------------------------- |
+| `shared-auth/guards.ts` — `requireToken` | `system`                           |
+| `collector` — activation logging         | `system`                           |
+| `collector` — private discovery, enquiry | `collector`                        |
+| `collector` — public intake form         | anonymous (granted INSERT only)    |
+| `vera` — public catalogue                | anonymous (SELECT on released)     |
+| `vera` — artist profile read and write   | `artist`                           |
+| `command-center` — every query           | `admin` / `advisor` via `readAs`   |
+| `command-center` — every audited write   | `setActor` inside `performAudited` |
 
-```diff
--DATABASE_URL="postgresql://qhakaza:qhakaza@localhost:5432/qhakaza_art?schema=public"
-+DATABASE_URL="postgresql://qhakaza_app:qhakaza_app@localhost:5432/qhakaza_art?schema=public"
-```
+Anything not on this list runs anonymous and gets only what the matrix grants
+`public`. Forgetting to declare an actor costs access; it never silently keeps
+it.
 
-Migrations keep using the owner. Add to the root `.env`:
+### Tests connect as the owner
 
-```
-DIRECT_DATABASE_URL="postgresql://qhakaza:qhakaza@localhost:5432/qhakaza_art?schema=public"
-```
-
-### Already adopted
-
-| Path                                     | Actor                                  |
-| ---------------------------------------- | -------------------------------------- |
-| `shared-auth/guards.ts` — `requireToken` | `system`                               |
-| `collector` — activation logging         | `system`                               |
-| `collector` — private discovery queries  | `collector`                            |
-| `collector` — enquiry submission         | `collector`                            |
-| `collector` — public intake form         | anonymous (granted INSERT)             |
-| `vera` — public catalogue queries        | anonymous (granted SELECT on released) |
-
-### Still to adopt before cutover
-
-| Path                                | Needs               | Note                                                                                      |
-| ----------------------------------- | ------------------- | ----------------------------------------------------------------------------------------- |
-| `vera` — `saveArtistProfile`        | `artist`            | See the slug problem below                                                                |
-| `vera` — `getMyArtistProfile`       | `artist`            | Straightforward wrap                                                                      |
-| `command-center` — all queries      | `admin` / `advisor` | Straightforward wrap                                                                      |
-| `command-center` — `performAudited` | `admin` / `advisor` | Use `setActor` on its existing transaction; Prisma has no nested interactive transactions |
+E2E fixtures and integration suites seed with a **privileged** client
+(`DIRECT_DATABASE_URL`). Creating an artist or an invitation is something RLS
+correctly forbids an anonymous app connection from doing. The app under test
+still runs constrained — that is the point; the fixtures only arrange the world
+around it.
 
 ## Three things RLS changes that are easy to miss
 
@@ -87,17 +77,19 @@ therefore behaves differently from the first.
 Every policy uses `nullif(current_setting(...), '')` before `coalesce`. Removing
 that would make the public site intermittently lose its own public data.
 
-### 3. Uniqueness checks stop seeing what they need — **unresolved**
+### 3. Uniqueness checks stop seeing what they need — **fixed**
 
-`saveArtistProfile` mints a slug by asking whether a candidate is already taken.
-Under the `artist` policy an artist sees only their own row, so that check
-returns "free" for a slug another artist already holds, and the insert then
-fails on the unique constraint.
+`saveArtistProfile` used to mint a slug by asking whether a candidate was
+already taken. Under the `artist` policy an artist sees only their own row, so
+that check reported every other artist's slug as free and the insert then failed
+on the unique constraint.
 
-This is not yet fixed and is why Vera's artist path has not been cut over. The
-options are to catch `P2002` and retry with a suffix, to move slug minting into
-a `system` context, or to add a narrow policy exposing slugs alone. Each has
-trade-offs and none should be chosen in a hurry.
+Fixed by inverting it: `slugCandidates()` produces `base`, `base-2`, `base-3`…
+and each is _attempted_, with a `P2002` on `slug` moving to the next. The unique
+index is the only thing that actually knows what is free, so it is what decides.
+
+This was a latent bug independent of RLS — check-then-insert also loses to two
+artists onboarding simultaneously. RLS surfaced it; it was always wrong.
 
 ## Two contexts that exist before a user does
 
