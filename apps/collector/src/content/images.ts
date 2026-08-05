@@ -9,7 +9,7 @@
  * without shipping broken image references.
  */
 export const IMAGES: Record<string, string | null> = {
-  'collector-hero': null,
-  'collector-belief': null,
-  'collector-experience': null,
+  'collector-hero': '/hero-bg.png',
+  'collector-belief': '/belief-collector.png',
+  'collector-experience': '/featured-dinner.png',
 };

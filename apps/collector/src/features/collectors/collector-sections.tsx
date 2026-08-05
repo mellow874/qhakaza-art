@@ -36,15 +36,16 @@ export function CollectorHero() {
         <p className="text-muted mt-4 max-w-xl text-sm italic">{hero.membershipNote}</p>
       </div>
 
-      <div className="relative min-h-[22rem] lg:min-h-[40rem]">
+ <div className="relative min-h-[22rem] lg:min-h-screen">
         <EditorialImage
           src={IMAGES['collector-hero']}
           alt={hero.imageAlt}
           priority
-          sizes="(max-width: 1024px) 100vw, 50vw"
-          className="absolute inset-0 h-full w-full object-cover"
+          sizes="100vw"
+          className="absolute inset-0 h-full w-full object-cover object-right"
         />
       </div>
+   
     </section>
   );
 }
