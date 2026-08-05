@@ -8,4 +8,5 @@
 
 export { prisma } from './client';
 export * from './entities';
+export * from './actor';
 export * from './rls';

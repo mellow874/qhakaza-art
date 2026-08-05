@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-import { prisma } from '@qhakaza/shared-db';
+import { asSystem } from '@qhakaza/shared-db';
 
 import { isRole, type Role } from './rbac';
 
@@ -88,18 +88,22 @@ export async function requireToken(token: string | undefined | null): Promise<To
 
   const fingerprint = fingerprintToken(token);
 
-  const invitation = await prisma.memberInvitation.findUnique({
-    where: { tokenHash: fingerprint },
-    select: {
-      id: true,
-      membershipId: true,
-      email: true,
-      tokenHash: true,
-      status: true,
-      expiresAt: true,
-      revokedAt: true,
-    },
-  });
+  // The `system` context: the door must read an invitation before any actor
+  // exists. RLS grants `system` SELECT on this one table and nothing else.
+  const invitation = await asSystem((tx) =>
+    tx.memberInvitation.findUnique({
+      where: { tokenHash: fingerprint },
+      select: {
+        id: true,
+        membershipId: true,
+        email: true,
+        tokenHash: true,
+        status: true,
+        expiresAt: true,
+        revokedAt: true,
+      },
+    }),
+  );
 
   if (!invitation || !digestsMatch(invitation.tokenHash, fingerprint)) {
     return { ok: false, reason: 'INVALID_TOKEN', fingerprint };

@@ -31,7 +31,16 @@ export async function submitCollectorApplication(
   }
 
   try {
-    await prisma.collectorIntake.create({ data: parsed.data });
+    /*
+     * `createMany`, not `create`.
+     *
+     * Under RLS this table is write-only for the anonymous public: an applicant
+     * may submit, and may never read intakes back — not even their own. Prisma's
+     * `create()` issues INSERT ... RETURNING, and RETURNING requires SELECT
+     * permission, so it would insert the row and then be refused the read-back.
+     * `createMany` returns a count and asks for nothing it cannot have.
+     */
+    await prisma.collectorIntake.createMany({ data: [parsed.data] });
     return { ok: true };
   } catch (error) {
     console.error('submitCollectorApplication failed', error);

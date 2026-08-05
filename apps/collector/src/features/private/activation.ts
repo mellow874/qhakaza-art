@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 
 import { auth } from '@qhakaza/shared-auth/server';
 import { fingerprintToken, requireRole, requireToken } from '@qhakaza/shared-auth/guards';
-import { prisma } from '@qhakaza/shared-db';
+import { asSystem } from '@qhakaza/shared-db';
 import type { ActivationOutcome } from '@qhakaza/shared-db';
 
 /**
@@ -36,18 +36,28 @@ async function recordAttempt(input: {
   try {
     const headerList = await headers();
 
-    await prisma.activationAttempt.create({
-      data: {
-        outcome: input.outcome,
-        tokenFingerprint: input.tokenFingerprint,
-        invitationId: input.invitationId ?? null,
-        // Behind a proxy the socket address is the proxy's, so the forwarded
-        // header is the only useful value. It is attacker-controlled and is
-        // recorded as evidence, never trusted for a decision.
-        ipAddress: headerList.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
-        userAgent: headerList.get('user-agent'),
-      },
-    });
+    // The `system` context: a failed attempt has, by definition, no valid
+    // actor. RLS grants `system` INSERT here and nothing else.
+    //
+    // `createMany` rather than `create`: this table is append-only and grants
+    // no SELECT to `system`, so INSERT ... RETURNING would be refused the
+    // read-back and the whole write would appear to fail.
+    await asSystem((tx) =>
+      tx.activationAttempt.createMany({
+        data: [
+          {
+            outcome: input.outcome,
+            tokenFingerprint: input.tokenFingerprint,
+            invitationId: input.invitationId ?? null,
+            // Behind a proxy the socket address is the proxy's, so the
+            // forwarded header is the only useful value. It is
+            // attacker-controlled and recorded as evidence, never trusted.
+            ipAddress: headerList.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+            userAgent: headerList.get('user-agent'),
+          },
+        ],
+      }),
+    );
   } catch (error) {
     // Never let logging take the page down: failing closed on a write error
     // would turn an audit problem into an outage, and failing *open* silently

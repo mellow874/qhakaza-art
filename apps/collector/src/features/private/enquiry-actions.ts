@@ -2,7 +2,7 @@
 
 import { requireRole, requireToken } from '@qhakaza/shared-auth/guards';
 import { auth } from '@qhakaza/shared-auth/server';
-import { prisma } from '@qhakaza/shared-db';
+import { withActor } from '@qhakaza/shared-db';
 
 import { enquirySchema } from '@/lib/validation/enquiry';
 
@@ -39,29 +39,43 @@ export async function submitEnquiry(input: unknown): Promise<EnquiryResult> {
   if (!grant.ok) return { ok: false, error: 'DENIED' };
 
   try {
-    // An artworkId is only accepted if it names a work actually released to
-    // members. Otherwise a crafted request could attach an enquiry to a draft
-    // and have its title read back to the member from the advisor's screen.
-    let artworkId: string | null = null;
+    // One `collector` transaction for both steps, so the lookup and the write
+    // are judged under the same actor — and RLS narrows the lookup to released
+    // work whether or not the WHERE clause below says so.
+    const written = await withActor({ role: 'collector', userId: grant.userId }, async (tx) => {
+      // An artworkId is only accepted if it names a work actually released to
+      // members. Otherwise a crafted request could attach an enquiry to a draft
+      // and have its title read back from the advisor's screen.
+      let artworkId: string | null = null;
 
-    if (parsed.data.artworkId) {
-      const released = await prisma.artwork.findFirst({
-        where: { id: parsed.data.artworkId, status: 'LISTED', artist: { approved: true } },
-        select: { id: true },
+      if (parsed.data.artworkId) {
+        const released = await tx.artwork.findFirst({
+          where: { id: parsed.data.artworkId, status: 'LISTED', artist: { approved: true } },
+          select: { id: true },
+        });
+        if (!released) return false;
+        artworkId = released.id;
+      }
+
+      // `createMany`: a collector may insert a note but may only read back its
+      // own, and RLS evaluates the `own` predicate against Membership. Asking
+      // for RETURNING here would be asking for a read the policy need not grant.
+      await tx.privateNoteSubmission.createMany({
+        data: [
+          {
+            membershipId: token.membershipId,
+            artworkId,
+            subject: parsed.data.subject,
+            body: parsed.data.body,
+            createdById: grant.userId,
+          },
+        ],
       });
-      if (!released) return { ok: false, error: 'DENIED' };
-      artworkId = released.id;
-    }
 
-    await prisma.privateNoteSubmission.create({
-      data: {
-        membershipId: token.membershipId,
-        artworkId,
-        subject: parsed.data.subject,
-        body: parsed.data.body,
-        createdById: grant.userId,
-      },
+      return true;
     });
+
+    if (!written) return { ok: false, error: 'DENIED' };
 
     return { ok: true };
   } catch (error) {
