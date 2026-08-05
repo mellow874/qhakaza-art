@@ -1,0 +1,181 @@
+@import 'tailwindcss';
+
+/**
+ * Qhakaza Art design tokens — derived from the supplied reference screens.
+ *
+ * The palette is a dark warm editorial one: espresso ground, ivory text, camel
+ * accent. Dark is the default everywhere, public and signed-in alike.
+ *
+ * Token names describe *role*, not colour ("heading", "canvas", "line"), so a
+ * future theme change stays a one-file edit. Screens must reference the tokens
+ * (bg-canvas, text-heading, border-line) and never raw hex.
+ * See docs/DESIGN.md for usage rules.
+ */
+@theme {
+  /* --- Surfaces, darkest to lightest --- */
+  --color-canvas: #14100d; /* page ground — near-black espresso */
+  --color-surface: #1c1712; /* cards, panels, form fields, footer */
+  --color-raised: #241d17; /* hover states, elevated tiles */
+
+  /* --- Text --- */
+  --color-heading: #f4ede4; /* headings and primary emphasis */
+  --color-body: #d9cfc3; /* long-form copy */
+  --color-muted: #9c8e80; /* captions, meta, eyebrow labels */
+
+  /* --- Accent (camel) --- */
+  /* Two accent tokens, because a fill and a label have different jobs:
+     `accent` is the camel used for button fills, borders and rules;
+     `accent-ink` is accent-*coloured text*, which must clear 4.5:1 against the
+     page ground. On the dark theme they can be the same value; on the light one
+     the fill stays pale while the ink darkens to a bronze. */
+  --color-accent: #c08b5c;
+  --color-accent-ink: #c08b5c;
+  --color-accent-hover: #d3a077;
+  --color-accent-soft: #3a2b20; /* tints and chips on the dark ground */
+  /* Foreground on a camel fill. Deliberately dark in *both* themes: cream on
+     camel is ~2.6:1 and fails, whereas dark on camel is ~6.4:1. */
+  --color-on-accent: #14100d;
+
+  /* --- Lines & feedback --- */
+  --color-line: #2e2620;
+  --color-line-strong: #473a31;
+  --color-success: #7fa986;
+  --color-danger: #e5786b;
+
+  /* --- Type --- */
+  --font-display: var(--font-display), 'Cormorant Garamond', 'Times New Roman', serif;
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  --font-script: var(--font-script), 'Segoe Script', cursive; /* wordmark only */
+
+  /* Editorial headings: large, light weight, tight leading */
+  --text-display: 3.5rem;
+  --text-display--line-height: 1.08;
+  --text-display--letter-spacing: -0.01em;
+  --text-hero: 4.5rem;
+  --text-hero--line-height: 1.04;
+  --text-hero--letter-spacing: -0.02em;
+
+  /* --- Rhythm --- */
+  --spacing-section: 7rem; /* vertical gap between page sections on desktop */
+  --spacing-section-sm: 4rem; /* …and on mobile */
+  --radius-card: 2px; /* near-square; softness comes from colour and space */
+  --radius-soft: 12px; /* the rounded photo tiles in the reference */
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
+  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.35), 0 16px 40px rgb(0 0 0 / 0.45);
+}
+
+/**
+ * Theme scopes.
+ *
+ * The tokens above are the default: the dark artist-facing site. The Collector
+ * Intelligence Suite is a light sub-brand, and both sites use the same
+ * components — which works only because the tokens are named for their *role*
+ * ("canvas", "heading", "line") rather than their colour.
+ *
+ * Apply `.theme-light` to a subtree to flip it, and `.theme-dark` to flip a
+ * band back — the collector pages are light with full-bleed dark bands.
+ */
+@layer base {
+  .theme-light {
+    color-scheme: light;
+
+    --color-canvas: #faf7f1; /* warm cream page ground */
+    --color-surface: #fffdfa; /* record cards, panels */
+    --color-raised: #f2ebe1; /* alternating sections, chips */
+
+    --color-heading: #2e2119;
+    --color-body: #5c4e43;
+    --color-muted: #8b7a6b;
+
+    /* Fill stays the pale camel of the design; ink darkens to clear 4.5:1
+       against the cream ground, which the pale camel does not. */
+    --color-accent: #c69c6d;
+    --color-accent-ink: #8f6636;
+    --color-accent-hover: #b0854f;
+    --color-accent-soft: #eadfd0;
+
+    --color-line: #e2d8c9;
+    --color-line-strong: #c9bca9;
+    --color-danger: #a33a2c;
+    --color-success: #4e6b52;
+  }
+
+  .theme-dark {
+    color-scheme: dark;
+
+    --color-canvas: #33261d; /* the warm dark bands on the collector pages */
+    --color-surface: #3d2e23;
+    --color-raised: #48372a;
+
+    --color-heading: #f7f1e8;
+    --color-body: #ddd2c4;
+    --color-muted: #b3a292;
+
+    --color-accent: #c69c6d;
+    --color-accent-ink: #c69c6d;
+    --color-accent-hover: #d6b183;
+    --color-accent-soft: #4a382a;
+
+    --color-line: #4c3b2e;
+    --color-line-strong: #6a5442;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    /* Tells the browser to render native controls and scrollbars dark. */
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-body);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    color: var(--color-heading);
+    font-weight: 400;
+  }
+
+  /* Keyboard users must always be able to see where they are. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /*
+   * The small letterspaced label above a heading — the most repeated motif in
+   * the design. Tan, not grey, and always paired with the short rule below.
+   */
+  .eyebrow {
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-accent-ink);
+  }
+
+  /* Uppercase letterspaced label, as used on the navigation CTAs. */
+  .caps {
+    font-size: 0.75rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  /* The short horizontal rule that sits under an eyebrow. */
+  .rule {
+    display: block;
+    width: 3rem;
+    height: 1px;
+    background-color: var(--color-accent);
+    opacity: 0.6;
+  }
+}

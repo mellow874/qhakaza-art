@@ -144,9 +144,10 @@ admin apps follow in Phases 3 and 4, and the root app is deleted in Phase 6.
 apps/
   vera/              # ✅ public artist website — port 3001, E2E on 4320
     src/app/         #    (public) marketing + (artist) area + api/auth
-    src/{components,content,features,lib,types}
-    tests/e2e/       #    its own Playwright suite
-  collector/         # ⏳ Phase 3 — invite-only concierge, /private/<token>
+  collector/         # ✅ collector platform — port 3002, E2E on 4321
+    src/app/(marketing)/  #  /collectors/* — PUBLIC, indexed, has SEO
+    src/app/(private)/    #  /private/<token> — invite-only, noindex
+    src/features/private/ #  activation gate, discovery, enquiries
   command-center/    # ⏳ Phase 4 — AdminCommandCenter
 
 packages/
@@ -155,10 +156,30 @@ packages/
   shared-auth/       # roles, rbac, requireRole(), requireToken(), credentials
   shared-ui/         # Button, Field, EditorialImage, cn — used by 2+ apps only
 
-src/                 # ⏳ what has not been extracted yet: the collector
-                     #    marketing tree plus the /admin and /collector stubs.
-                     #    Deleted in Phase 6. E2E on 4319.
+src/                 # ⏳ the /admin and /collector stubs, nothing else.
+                     #    Becomes the Command Center in Phase 4; deleted in 6.
 ```
+
+### How `/private/<token>` is gated
+
+Three things must hold, and they are checked where the database is reachable —
+**not** at the edge proxy:
+
+1. The token resolves to a `MemberInvitation` whose SHA-256 fingerprint matches,
+   and which is neither expired nor revoked. The plaintext token is never stored.
+2. The caller holds COLLECTOR, ADMIN or ADVISOR.
+3. Every attempt, successful or not, writes an `ActivationAttempt`.
+
+The gate lives in the **layout** wrapping `/private/[token]`, so a page added
+later is covered whether or not its author remembers to guard it.
+
+`/private` is deliberately absent from the proxy's role fence. Fencing it there
+would bounce anonymous requests to `/login` before anything could record them —
+and anonymous requests are exactly what token guessing looks like.
+
+Every refusal renders identical markup. Forged, expired, revoked and wrong-role
+are indistinguishable from outside, so the page cannot be used to discover
+whether a guessed token exists. The reason goes to `ActivationAttempt`.
 
 Each app owns its entry point, router, `next.config.ts`, `tsconfig.json`,
 Playwright config and env file, and reaches the database **only** through

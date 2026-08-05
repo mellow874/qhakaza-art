@@ -20,9 +20,14 @@ describe('requiredRolesForPath', () => {
     expect(requiredRolesForPath('/admin/orders/ord_1')).toEqual(['ADMIN', 'ADVISOR']);
   });
 
-  it('fences the private collector platform to collectors and staff', () => {
-    // Role is only half the gate here — `requireToken` supplies the other half.
-    expect(requiredRolesForPath('/private/abc123')).toEqual(['COLLECTOR', 'ADMIN', 'ADVISOR']);
+  it('leaves /private to the Collector Platform, not the edge proxy', () => {
+    /*
+     * Not an oversight. Fencing /private here would bounce anonymous requests
+     * to /login before anything could record them — and anonymous requests are
+     * exactly what token guessing looks like. The private layout validates the
+     * token and the role together, and writes an ActivationAttempt either way.
+     */
+    expect(requiredRolesForPath('/private/abc123')).toBeNull();
   });
 
   it('returns null for public paths', () => {

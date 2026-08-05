@@ -36,11 +36,21 @@ const PROTECTED_AREAS = [
   { prefix: '/artist', roles: ['ARTIST'] },
   { prefix: '/collector', roles: ['COLLECTOR'] },
   { prefix: '/admin', roles: COMMAND_CENTER_ROLES },
-  // The invite-only collector platform. Role alone is not sufficient here —
-  // a valid, unexpired, unrevoked token is also required, which `requireToken`
-  // checks against MemberInvitation. This entry is the role half only.
-  { prefix: '/private', roles: ['COLLECTOR', 'ADMIN', 'ADVISOR'] },
 ] as const satisfies ReadonlyArray<{ prefix: string; roles: readonly Role[] }>;
+
+/*
+ * `/private` is deliberately NOT listed above.
+ *
+ * It is gated in the Collector Platform's private layout instead, which
+ * validates the invitation token *and* the role. Fencing it here as well would
+ * redirect anonymous requests to /login before any code could run — and
+ * anonymous requests are precisely the ones worth recording, because that is
+ * what token guessing looks like. Enforcement lives where the database is
+ * reachable and every attempt can be written to ActivationAttempt.
+ *
+ * The layout, not the page, holds the gate, so a private route added later is
+ * covered whether or not its author remembers to guard it.
+ */
 
 /** Matches a path segment boundary, so `/artists` never matches `/artist`. */
 function isWithin(pathname: string, prefix: string): boolean {
