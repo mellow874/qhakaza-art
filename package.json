@@ -23,10 +23,11 @@
     "db:reset": "prisma migrate reset --force --schema packages/shared-db/prisma/schema.prisma",
     "db:deploy": "prisma migrate deploy --schema packages/shared-db/prisma/schema.prisma",
     "vera": "npm run dev --workspace @qhakaza/vera",
-    "test:workspace": "npm test && npm test --workspace @qhakaza/vera && npm test --workspace @qhakaza/collector",
-    "typecheck:workspace": "npm run typecheck && npm run typecheck --workspace @qhakaza/vera && npm run typecheck --workspace @qhakaza/collector",
-    "e2e:workspace": "npm run test:e2e --workspace @qhakaza/vera && npm run test:e2e --workspace @qhakaza/collector",
-    "collector": "npm run dev --workspace @qhakaza/collector"
+    "test:workspace": "npm test && npm test --workspace @qhakaza/vera && npm test --workspace @qhakaza/collector && npm test --workspace @qhakaza/command-center",
+    "typecheck:workspace": "npm run typecheck && npm run typecheck --workspace @qhakaza/vera && npm run typecheck --workspace @qhakaza/collector && npm run typecheck --workspace @qhakaza/command-center",
+    "e2e:workspace": "npm run test:e2e --workspace @qhakaza/vera && npm run test:e2e --workspace @qhakaza/collector && npm run test:e2e --workspace @qhakaza/command-center",
+    "collector": "npm run dev --workspace @qhakaza/collector",
+    "command": "npm run dev --workspace @qhakaza/command-center"
   },
   "prisma": {
     "seed": "tsx packages/shared-db/prisma/seed.ts",

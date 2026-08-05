@@ -1,0 +1,73 @@
+import { headers } from 'next/headers';
+
+import { requireRole, type Session } from '@qhakaza/shared-auth/guards';
+import { COMMAND_CENTER_ROLES } from '@qhakaza/shared-auth';
+import { prisma } from '@qhakaza/shared-db';
+import type { Prisma } from '@prisma/client';
+
+/**
+ * Every Command Center action goes through here.
+ *
+ * The action and its AuditLog row are written in **one transaction**. That is
+ * the whole point: "remember to also write an audit record" is a rule that
+ * holds until the day someone is in a hurry. Here, an action that cannot be
+ * recorded does not happen — the transaction rolls back and the caller gets an
+ * error rather than a silent, untraceable change.
+ *
+ * Authorisation is checked here too, so no admin mutation can be written
+ * without both a permitted role and a trail.
+ */
+
+export type AuditActor = { userId: string; role: 'ADMIN' | 'ADVISOR' };
+
+export type AdminFailure = { ok: false; error: 'FORBIDDEN' | 'NOT_FOUND' | 'INVALID' | 'UNKNOWN' };
+
+/** Narrows a session to a Command Center actor, or explains why not. */
+export function commandCentreActor(session: Session): AuditActor | AdminFailure {
+  const grant = requireRole(session, COMMAND_CENTER_ROLES);
+  if (!grant.ok) return { ok: false, error: 'FORBIDDEN' };
+  return { userId: grant.userId, role: grant.role as 'ADMIN' | 'ADVISOR' };
+}
+
+export function isFailure(value: AuditActor | AdminFailure): value is AdminFailure {
+  return 'ok' in value && value.ok === false;
+}
+
+type Audited<T> = {
+  actor: AuditActor;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  summary?: string;
+  before?: Prisma.InputJsonValue | null;
+  after?: Prisma.InputJsonValue | null;
+  /** The mutation. Runs inside the same transaction as the audit write. */
+  run: (tx: Prisma.TransactionClient) => Promise<T>;
+};
+
+export async function performAudited<T>(input: Audited<T>): Promise<T> {
+  const headerList = await headers();
+  // Attacker-controlled; recorded as evidence, never trusted for a decision.
+  const ipAddress = headerList.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+
+  return prisma.$transaction(async (tx) => {
+    const result = await input.run(tx);
+
+    await tx.auditLog.create({
+      data: {
+        actorId: input.actor.userId,
+        actorRole: input.actor.role,
+        action: input.action,
+        entityType: input.entityType,
+        entityId: input.entityId ?? null,
+        summary: input.summary ?? null,
+        before: input.before ?? undefined,
+        after: input.after ?? undefined,
+        ipAddress,
+        createdById: input.actor.userId,
+      },
+    });
+
+    return result;
+  });
+}
