@@ -11,11 +11,25 @@ export const brand = {
   suite: 'Collector Intelligence Suite',
 };
 
+/**
+ * The navigation labels are the design's. The destinations are the pages that
+ * actually exist.
+ *
+ * The design named four nav items but only supplied designs for two of the
+ * pages behind them, so `/collectors/suite` and `/collectors/pricing` were
+ * links to nothing — a 404 from the site's own header. Rather than invent two
+ * pages, each label now points at the page that already carries its content:
+ *
+ *   Suite   → the landing page, which is the description of the suite
+ *   Pricing → the membership page, which is where the $10,000/year sits
+ *
+ * If dedicated pages are designed later, these are two href changes.
+ */
 export const NAV = [
-  { href: '/collectors/suite', label: 'Suite' },
+  { href: '/collectors', label: 'Suite' },
   { href: '/collectors/about', label: 'About' },
   { href: '/collectors/membership', label: 'Membership' },
-  { href: '/collectors/pricing', label: 'Pricing' },
+  { href: '/collectors/membership', label: 'Pricing' },
 ] as const;
 
 export const APPLY_CTA = { href: '/collectors/apply', label: 'Apply' };
@@ -27,7 +41,9 @@ export const hero = {
   body: 'A private collector environment where African contemporary art is experienced, understood, and acquired through trusted access to carefully vetted emerging artists, verified records, clear pricing context, market intelligence, and discreet, invitation-only experiences',
   note: 'For those who prefer an intelligent, culturally rooted entry into African art collecting',
   primaryCta: { label: 'Begin collector intake', href: '/collectors/apply' },
-  secondaryCta: { label: 'Explore the suite', href: '/collectors/suite' },
+  // Down to what the suite offers, on this same page — there is no separate
+  // /collectors/suite, and this button used to lead to a 404.
+  secondaryCta: { label: 'Explore the suite', href: '#what-you-receive' },
   membershipNote:
     'Annual membership for serious collectors seeking private access, trusted context, and premium acquisition pathways',
   imageAlt:
@@ -139,13 +155,15 @@ export const closing = {
 
 export const footer = {
   tagline: 'A private gateway into carefully vetted emerging African art',
+  // Same principle as NAV: the design's labels, pointing at the sections that
+  // hold the content. The anchors are real element ids on the landing page.
   columns: [
     {
       heading: 'Suite',
       links: [
-        { href: '/collectors/suite', label: 'Artist Intelligence' },
-        { href: '/collectors/suite', label: 'Artwork Intelligence' },
-        { href: '/collectors/suite', label: 'Intelligence' },
+        { href: '/collectors#intelligence-preview', label: 'Artist Intelligence' },
+        { href: '/collectors#intelligence-preview', label: 'Artwork Intelligence' },
+        { href: '/collectors#what-you-receive', label: 'Intelligence' },
         { href: '/collectors/apply', label: 'Request Access' },
       ],
     },
@@ -154,8 +172,11 @@ export const footer = {
       links: [
         { href: '/collectors/about', label: 'About Qhakaza' },
         { href: '/collectors', label: 'Collector Intelligence' },
-        { href: '/collectors/experiences', label: 'Private Experiences' },
-        { href: '/artists', label: 'Artists' },
+        { href: '/collectors#featured-experience', label: 'Private Experiences' },
+        // "Artists" is deliberately absent. It pointed at `/artists`, which is
+        // a Vera route and 404s here — and the artists a member may see are
+        // behind `/private`, so there is nothing public to link to.
+        { href: '/collectors/methodology', label: 'Methodology' },
       ],
     },
     {

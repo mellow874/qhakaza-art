@@ -95,8 +95,45 @@ Optional, where used: `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (redirect URI
 
 ## The database
 
-Any managed Postgres works — Neon, Supabase, RDS, Vercel Postgres. It needs to
-support roles and RLS, which they all do.
+Any managed Postgres works — Supabase, Neon, RDS, Vercel Postgres. It needs to
+support creating a role and enabling RLS, which they all do.
+
+**Nothing in the code is tied to a provider.** You are swapping a connection
+string, not migrating. The local `embedded-postgres` is a development
+convenience and is a devDependency — it cannot and does not run on Vercel.
+
+### Supabase specifically
+
+Supabase gives you two connection strings, and **which one goes where matters**:
+
+| Variable              | Supabase string                            | Port |
+| --------------------- | ------------------------------------------ | ---- |
+| `DIRECT_DATABASE_URL` | **Direct connection**                      | 5432 |
+| `DATABASE_URL`        | **Transaction pooler** + `?pgbouncer=true` | 6543 |
+
+```
+DIRECT_DATABASE_URL="postgresql://postgres:PW@db.PROJECT.supabase.co:5432/postgres"
+DATABASE_URL="postgresql://qhakaza_app:APP_PW@aws-0-REGION.pooler.supabase.com:6543/postgres?pgbouncer=true"
+```
+
+Use the **transaction** pooler, not session mode. `withActor()` sets the actor
+with `set_config(..., true)`, which is transaction-scoped — that is exactly what
+transaction pooling supports, and it is why it was written that way.
+
+Three Supabase notes:
+
+1. **You are using Supabase as a database only** — not Supabase Auth, not its
+   client libraries. Sign-in is Auth.js against the `User` table.
+2. **`postgres` is the owner.** Run migrations as it; the migration creates
+   `qhakaza_app` and its grants for you.
+3. Supabase's dashboard has its own RLS UI. Ignore it — the policies here are in
+   migrations, generated from `rls.ts`. Editing them in the dashboard would drift
+   from the repo, and `rls.db.test.ts` would start failing, which is the point.
+
+### Neon
+
+Simpler: the pooled string for `DATABASE_URL`, the unpooled one for
+`DIRECT_DATABASE_URL`. Same two-string shape.
 
 **One-time setup**, run as the owner:
 
