@@ -25,7 +25,8 @@
     "e2e:workspace": "npm run test:e2e --workspace @qhakaza/vera && npm run test:e2e --workspace @qhakaza/collector && npm run test:e2e --workspace @qhakaza/command-center",
     "collector": "npm run dev --workspace @qhakaza/collector",
     "command-center": "npm run dev --workspace @qhakaza/command-center",
-    "build:all": "npm run build --workspace @qhakaza/vera && npm run build --workspace @qhakaza/collector && npm run build --workspace @qhakaza/command-center"
+    "build:all": "npm run build --workspace @qhakaza/vera && npm run build --workspace @qhakaza/collector && npm run build --workspace @qhakaza/command-center",
+    "postinstall": "prisma generate --schema packages/shared-db/prisma/schema.prisma"
   },
   "prisma": {
     "seed": "tsx packages/shared-db/prisma/seed.ts",
