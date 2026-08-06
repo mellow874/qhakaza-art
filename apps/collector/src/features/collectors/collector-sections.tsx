@@ -18,7 +18,7 @@ export function CollectorHero() {
         <p className="text-body max-w-xl leading-relaxed">{hero.body}</p>
         <p className="text-muted max-w-xl text-sm italic">{hero.note}</p>
 
-        <div className="mt-2 flex flex-wrap gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 pt-2">
           <Link
             href={hero.primaryCta.href}
             className={buttonStyles({ size: 'lg', className: 'caps' })}

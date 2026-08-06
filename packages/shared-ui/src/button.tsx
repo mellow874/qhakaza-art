@@ -7,7 +7,7 @@ import { cn } from '@qhakaza/shared-ui';
  * primitive — anchors and buttons stay semantically distinct.
  */
 export const buttonStyles = cva(
-  'inline-flex items-center justify-center gap-2 rounded-(--radius-card) font-medium transition-colors disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center gap-2 rounded-(--radius-card) font-medium whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
