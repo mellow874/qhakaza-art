@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 
+/* Shared-ui ships button/field classes from a workspace package — Tailwind must
+   scan it or size utilities (min-h-*, px-*, py-*) never reach the CSS bundle. */
+@source '../../../../packages/shared-ui/src';
+
 /**
  * Qhakaza Art design tokens — derived from the supplied reference screens.
  *

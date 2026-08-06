@@ -41,7 +41,7 @@ export function CollectorHeader() {
             </Link>
           ))}
 
-          <Link href={APPLY_CTA.href} className={buttonStyles({ size: 'md', className: 'caps' })}>
+          <Link href={APPLY_CTA.href} className={buttonStyles({ size: 'lg', className: 'caps' })}>
             {APPLY_CTA.label}
           </Link>
         </nav>
@@ -73,7 +73,7 @@ export function CollectorHeader() {
           <Link
             href={APPLY_CTA.href}
             onClick={() => setOpen(false)}
-            className="text-accent-ink caps"
+            className={buttonStyles({ size: 'lg', className: 'caps self-start' })}
           >
             {APPLY_CTA.label}
           </Link>
