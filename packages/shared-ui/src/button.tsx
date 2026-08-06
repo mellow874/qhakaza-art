@@ -23,8 +23,8 @@ export const buttonStyles = cva(
       // "Get Started" actions, so callers add `.caps` where it belongs.
       size: {
         sm: 'h-9 px-5 text-xs',
-        md: 'h-16 px-12 text-sm',
-        lg: 'h-16 px-14 text-base',
+        md: 'h-12 px-4 text-sm',
+        lg: 'h-12 px-4 text-base',
       },
     },
     defaultVariants: { variant: 'primary', size: 'md' },
