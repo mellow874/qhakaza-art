@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 
+@source '../../../../packages/shared-ui/src';
+
 /**
  * Qhakaza Art design tokens — derived from the supplied reference screens.
  *
