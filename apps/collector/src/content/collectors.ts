@@ -146,7 +146,7 @@ export const footer = {
         { href: 'https://qhakaza-art-vera.vercel.app/', label: 'Artist Intelligence' },
         { href: '/collectors/suite', label: 'Artwork Intelligence' },
         { href: '/collectors/suite', label: 'Intelligence' },
-        { href: '/collectors/membership', label: 'Request Access' },
+        { href: '/collectors', label: 'Request Access' },
       ],
     },
     {
