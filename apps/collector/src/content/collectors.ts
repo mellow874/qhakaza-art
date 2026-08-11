@@ -143,10 +143,10 @@ export const footer = {
     {
       heading: 'Suite',
       links: [
-        { href: '/collectors/suite', label: 'Artist Intelligence' },
+        { href: 'https://qhakaza-art-vera.vercel.app/', label: 'Artist Intelligence' },
         { href: '/collectors/suite', label: 'Artwork Intelligence' },
         { href: '/collectors/suite', label: 'Intelligence' },
-        { href: '/collectors/apply', label: 'Request Access' },
+        { href: '/collectors/membership', label: 'Request Access' },
       ],
     },
     {
