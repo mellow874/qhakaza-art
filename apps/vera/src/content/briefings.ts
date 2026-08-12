@@ -1,13 +1,4 @@
-/**
- * Intelligence Briefings, transcribed from the supplied designs.
- *
- * Shared by the home page's briefings strip and the /briefings index, so the
- * two can never drift apart.
- *
- * The excerpts are exactly the text shown in the design, truncation included —
- * the full article bodies have not been supplied, so nothing here is invented.
- * Individual articles at /briefings/<slug> are not built yet.
- */
+
 
 export const hero = {
   eyebrow: 'Research & commentary',
@@ -27,6 +18,7 @@ export type Briefing = {
   excerpt: string;
   date: string;
   dateLabel: string;
+  image: string;
   imageAlt: string;
 };
 
@@ -39,6 +31,7 @@ export const briefings: Briefing[] = [
       'Art has always lived between two worlds. In one world, it is expression, memory, identity, ritual, beauty, rebellion, and cultural…',
     date: '2026-05-07',
     dateLabel: '7 May 2026',
+    image: '/images/briefing1.jpg',
     imageAlt:
       'A draped metallic sculpture on a white plinth in a gallery, with framed paintings behind',
   },
@@ -50,7 +43,19 @@ export const briefings: Briefing[] = [
       'As the global art world becomes more structured around fairs, awards, public programming, institutional partnerships, and curat…',
     date: '2026-05-06',
     dateLabel: '6 May 2026',
+    image: '/images/briefing2.png',
     imageAlt:
       'Visitors at a gallery opening among large gold-toned portrait paintings and bronze figures',
+  },
+  {
+    slug: 'the-artist-as-asset',
+    category: 'Research',
+    title: 'The Artist as Asset: Building a Practice That Can Be Trusted at Scale',
+    excerpt:
+      'Further research and commentary from the Qhakaza Art Collective intelligence platform on how artists build trust, structure, and legibility around their practice.',
+    date: '2026-05-05',
+    dateLabel: '5 May 2026',
+    image: '/images/briefing3.png',
+    imageAlt: 'Qhakaza Art Collective intelligence briefing',
   },
 ];

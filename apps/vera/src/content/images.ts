@@ -1,23 +1,23 @@
-/**
- * Photography used across the marketing pages.
- *
- * Every entry is `null` until the real asset is supplied — `EditorialImage`
- * renders a tinted placeholder in that case, so layout and spacing are correct
- * without shipping broken image references.
- *
- * To add a photo: drop the file in `public/images/` and set the path here, e.g.
- *   hero: '/images/hero-brushes.jpg'
- */
-export const IMAGES: Record<string, string | null> = {
-  hero: null,
-  framework: null,
-  begin: null,
-  aboutDocuments: null,
-  'briefing-when-art-becomes-an-asset': null,
-  'briefing-the-visibility-gap': null,
+export const IMAGES = {
+  hero: '/images/about1.jpeg',
+  framework: '/images/about1.jpeg',
+  begin: '/images/artist1.jpeg',
+  aboutDocuments: '/images/about1.jpeg',
 
-  // Collector Intelligence Suite
-  'collector-hero': null,
-  'collector-belief': null,
-  'collector-experience': null,
-};
+  'briefing-when-art-becomes-an-asset': '/images/briefing1.jpg',
+  'briefing-the-visibility-gap': '/images/briefing2.png',
+  'briefing-the-artist-as-asset': '/images/briefing3.png',
+
+  artist1: '/images/artist1.jpeg',
+  artist2: '/images/artist2.jpeg',
+  artist3: '/images/artist3.jpeg',
+  artist4: '/images/artist4.png',
+
+  logo: '/images/02fc7f21a_QhakazaFinalLogoBlack.png',
+} as const;
+
+export const VIDEOS = {
+  hero: '/videos/home1.mp4',
+  home: '/videos/home1.mp4',
+  home1: '/videos/home1.mp4',
+} as const;

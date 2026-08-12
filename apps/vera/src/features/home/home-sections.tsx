@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { EditorialImage, buttonStyles } from '@qhakaza/shared-ui';
+import { buttonStyles } from '@qhakaza/shared-ui';
 import { SectionHeading } from '@/components/section-heading';
 import { briefings as briefingItems, homeStrip } from '@/content/briefings';
 import { artistNeeds, begin, framework, hero, platformPreview } from '@/content/home';
@@ -31,13 +31,17 @@ export function Hero() {
       </div>
 
       <div className="relative min-h-[24rem] lg:min-h-[42rem]">
-        <EditorialImage
-          src={IMAGES['hero']}
-          alt={hero.imageAlt}
-          priority
-          sizes="(max-width: 1024px) 100vw, 50vw"
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
           className="absolute inset-0 h-full w-full object-cover"
-        />
+          aria-hidden="true"
+        >
+          <source src={hero.video} type="video/mp4" />
+        </video>
       </div>
     </section>
   );
@@ -77,11 +81,17 @@ export function ArtistNeeds() {
 export function FrameworkQuote() {
   return (
     <section aria-labelledby="framework-quote" className="relative isolate overflow-hidden">
-      <EditorialImage
-        src={IMAGES['framework']}
-        alt={framework.imageAlt}
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
         className="absolute inset-0 -z-10 h-full w-full object-cover"
-      />
+        aria-hidden="true"
+      >
+        <source src={framework.video} type="video/mp4" />
+      </video>
       {/* Darkened so the quote keeps its contrast over a busy painting. */}
       <div className="bg-canvas/80 absolute inset-0 -z-10" aria-hidden="true" />
 
@@ -177,11 +187,17 @@ export function Briefings() {
 export function Begin() {
   return (
     <section aria-labelledby="begin" className="relative isolate overflow-hidden">
-      <EditorialImage
-        src={IMAGES['begin']}
-        alt={begin.imageAlt}
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        preload="auto"
         className="absolute inset-0 -z-10 h-full w-full object-cover"
-      />
+        aria-hidden="true"
+      >
+        <source src={begin.video} type="video/mp4" />
+      </video>
       <div className="bg-canvas/85 absolute inset-0 -z-10" aria-hidden="true" />
 
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-32 lg:py-40">

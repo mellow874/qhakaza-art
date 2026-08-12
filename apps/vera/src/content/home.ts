@@ -1,9 +1,11 @@
 /**
- * All copy for the home page, transcribed from the supplied design.
+
  *
- * Kept out of the components so wording can be edited without touching layout,
- * and so the same strings can be asserted in tests.
+ * Content is kept separate from components so wording and media references
+ * can be edited without touching layout or application logic.
  */
+
+
 
 export const hero = {
   eyebrow: 'Artist Intelligence Platform',
@@ -12,13 +14,17 @@ export const hero = {
   subtitle: 'Make your practice easier to trust, present, and collect',
   footEyebrow: 'African Art Intelligence',
   footLine: 'Qhakaza Art Collective',
-  imageAlt: 'Paint-loaded brushes drawing red and orange pigment across a white surface',
+
+  video: '/videos/home1.mp4',
+  imageAlt:
+    'Paint-loaded brushes drawing red and orange pigment across a white surface',
 };
 
 export const artistNeeds = {
   eyebrow: 'What the artist needs',
   title: 'A serious structure for a serious practice',
   subtitle: 'For artists whose work is ready to move beyond casual visibility',
+
   items: [
     {
       number: '01',
@@ -51,7 +57,8 @@ export const framework = {
   eyebrow: 'Our framework',
   quote: 'The problem is not the absence of quality.',
   quoteEmphasis: 'It is the absence of structure.',
-  imageAlt: 'A thickly painted abstract canvas in ochre, deep red and green',
+  imageAlt: 'A painting installation with layered surfaces and a strong gallery atmosphere.',
+  video: '/videos/home1.mp4',
 };
 
 export const sxScore = {
@@ -60,6 +67,7 @@ export const sxScore = {
   description:
     'The Sx Score measures how valuation-ready an artwork is based on documentation strength, market evidence, liquidity signals, narrative validation, and compliance structure',
   attribution: 'Qhakaza Art Collective · Internal evidence framework',
+
   metrics: [
     { code: 'CAM', label: 'Documentation strength', value: 72 },
     { code: 'MCP', label: 'Market evidence', value: 48 },
@@ -67,6 +75,7 @@ export const sxScore = {
     { code: 'NIS', label: 'Narrative validation', value: 55 },
     { code: 'CSI', label: 'Compliance structure', value: 65 },
   ],
+
   total: 54,
   totalOutOf: 100,
   band: 'Emerging Asset',
@@ -77,18 +86,24 @@ export const platformPreview = {
   title: 'Built for the rooms where details matter',
   description:
     'Each artist is presented through a structured record built to carry trust: the artworks, the context, the provenance, the documentation, the pricing logic, and the evidence serious audiences expect before they collect, exhibit, advise, or introduce the work',
+
   checklist: [
     'Identity intake completed',
     'Artworks registered with full metadata',
     'Documentation evidence attached',
     'Provenance narrative on record',
   ],
+
+  image: '/images/about1.jpeg',
+  video: '/videos/home1.mp4',
+
   // Illustrative record shown in the design, not live data.
   sample: {
     artist: {
       name: 'Marcus Adeyemi',
       detail: 'Lagos, Nigeria · Contemporary Painting',
     },
+
     works: [
       {
         title: 'Untitled, Lagos Series IV',
@@ -119,7 +134,18 @@ export const begin = {
   title: 'Begin structuring your practice.',
   description:
     'Open to any artist. Subscribe and access the Qhakaza Art Collective platform immediately. Build your structured profile, register your artworks, and present your practice with professional clarity.',
-  primaryCta: { label: 'Enter the suite', href: '/login' },
-  secondaryCta: { label: 'About the collective', href: '/about' },
+
+  primaryCta: {
+    label: 'Enter the suite',
+    href: '/login',
+  },
+
+  secondaryCta: {
+    label: 'About the collective',
+    href: '/about',
+  },
+
+  image: '/images/artist1.jpeg',
   imageAlt: 'A worn paintbrush resting on a painted wooden surface',
+  video: '/videos/home1.mp4',
 };
