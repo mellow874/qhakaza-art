@@ -146,7 +146,7 @@ export const footer = {
         { href: 'https://qhakaza-art-vera.vercel.app/', label: 'Artist Intelligence' },
         { href: '/collectors/suite', label: 'Artwork Intelligence' },
         { href: '/collectors/suite', label: 'Intelligence' },
-        { href: '/collectors', label: 'Request Access' },
+        { href: '/collectors/request', label: 'Request Access' },
       ],
     },
     {
@@ -361,4 +361,33 @@ export const methodology = {
     body: 'A private membership that offers collectors a composed way into African contemporary art, translating the work of artists, curators, galleries and advisors into clear intelligence, quiet preparation and well-timed access',
   },
   cta: { label: 'Apply for membership', href: '/collectors/apply' },
+};
+
+export const request = {
+  eyebrow: 'Private request',
+  title: 'Make a Private Request',
+  lede: 'Whether you are enquiring about an artist, a specific work, a private experience, or something else entirely — this is the quiet route',
+  form: {
+    nameLabel: 'Full name',
+    namePlaceholder: 'Your full name',
+    emailLabel: 'Email address',
+    emailPlaceholder: 'For correspondence',
+    typeLabel: 'Type of request',
+    typePlaceholder: 'Select the nature of your enquiry',
+    requestLabel: 'Your request',
+    requestPlaceholder: 'Share what brings you here',
+    types: [
+      { value: 'artist', label: 'Artist enquiry' },
+      { value: 'artwork', label: 'Artwork enquiry' },
+      { value: 'experience', label: 'Private experience request' },
+      { value: 'other', label: 'Something else' },
+    ],
+    submitLabel: 'Send request',
+    submittingLabel: 'Sending…',
+  },
+  received: {
+    title: 'Your request has been received',
+    body: 'Thank you for reaching out. Our team will review your enquiry and be in touch shortly.',
+  },
+  error: 'We could not send your request. Please try again.',
 };
