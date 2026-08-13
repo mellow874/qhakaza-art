@@ -54,3 +54,7 @@ apps/*/playwright-report
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+# Graphify generated files
+/graphify-out/
