@@ -9,14 +9,14 @@
  *   hero: '/images/hero-brushes.jpg'
  */
 export const IMAGES: Record<string, string | null> = {
-  hero: null,
-  framework: null,
-  begin: null,
-  aboutDocuments: null,
-  'briefing-when-art-becomes-an-asset': null,
-  'briefing-the-visibility-gap': null,
+  hero: '/images/photo-1(1).png',
+  framework: '/images/photo-1(1).png',
+  begin: '/images/photo-3.jpg',
+  aboutDocuments: '/images/photo-1(1).png',
+  'briefing-when-art-becomes-an-asset': '/images/photo-4.png',
+  'briefing-the-visibility-gap': '/images/photo-3.jpg',
 
-  // Collector Intelligence Suite
+  // Collector Intelligence Suite — no assets yet
   'collector-hero': null,
   'collector-belief': null,
   'collector-experience': null,

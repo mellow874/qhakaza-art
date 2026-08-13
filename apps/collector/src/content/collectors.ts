@@ -11,25 +11,11 @@ export const brand = {
   suite: 'Collector Intelligence Suite',
 };
 
-/**
- * The navigation labels are the design's. The destinations are the pages that
- * actually exist.
- *
- * The design named four nav items but only supplied designs for two of the
- * pages behind them, so `/collectors/suite` and `/collectors/pricing` were
- * links to nothing — a 404 from the site's own header. Rather than invent two
- * pages, each label now points at the page that already carries its content:
- *
- *   Suite   → the landing page, which is the description of the suite
- *   Pricing → the membership page, which is where the $10,000/year sits
- *
- * If dedicated pages are designed later, these are two href changes.
- */
 export const NAV = [
-  { href: '/collectors', label: 'Suite' },
+  { href: '/collectors/suite', label: 'Suite' },
   { href: '/collectors/about', label: 'About' },
   { href: '/collectors/membership', label: 'Membership' },
-  { href: '/collectors/membership', label: 'Pricing' },
+  { href: '/collectors/pricing', label: 'Pricing' },
 ] as const;
 
 export const APPLY_CTA = { href: '/collectors/apply', label: 'Apply' };
@@ -41,9 +27,7 @@ export const hero = {
   body: 'A private collector environment where African contemporary art is experienced, understood, and acquired through trusted access to carefully vetted emerging artists, verified records, clear pricing context, market intelligence, and discreet, invitation-only experiences',
   note: 'For those who prefer an intelligent, culturally rooted entry into African art collecting',
   primaryCta: { label: 'Begin collector intake', href: '/collectors/apply' },
-  // Down to what the suite offers, on this same page — there is no separate
-  // /collectors/suite, and this button used to lead to a 404.
-  secondaryCta: { label: 'Explore the suite', href: '#what-you-receive' },
+  secondaryCta: { label: 'Explore the suite', href: '/collectors/suite' },
   membershipNote:
     'Annual membership for serious collectors seeking private access, trusted context, and premium acquisition pathways',
   imageAlt:
@@ -131,7 +115,7 @@ export const experience = {
     'Curated collector education',
     'Private acquisition conversations',
   ],
-  cta: { label: 'Request access', href: '/collectors/apply' },
+  cta: { label: 'Request access', href: '/collectors/request' },
   imageAlt:
     'Guests at a candlelit dinner table while a host speaks, surrounded by African artworks',
 };
@@ -155,16 +139,14 @@ export const closing = {
 
 export const footer = {
   tagline: 'A private gateway into carefully vetted emerging African art',
-  // Same principle as NAV: the design's labels, pointing at the sections that
-  // hold the content. The anchors are real element ids on the landing page.
   columns: [
     {
       heading: 'Suite',
       links: [
-        { href: '/collectors#intelligence-preview', label: 'Artist Intelligence' },
-        { href: '/collectors#intelligence-preview', label: 'Artwork Intelligence' },
-        { href: '/collectors#what-you-receive', label: 'Intelligence' },
-        { href: '/collectors/apply', label: 'Request Access' },
+        { href: 'https://qhakaza-art-vera.vercel.app/', label: 'Artist Intelligence' },
+        { href: '/collectors/suite', label: 'Artwork Intelligence' },
+        { href: '/collectors/suite', label: 'Intelligence' },
+        { href: '/collectors/request', label: 'Request Access' },
       ],
     },
     {
@@ -172,11 +154,8 @@ export const footer = {
       links: [
         { href: '/collectors/about', label: 'About Qhakaza' },
         { href: '/collectors', label: 'Collector Intelligence' },
-        { href: '/collectors#featured-experience', label: 'Private Experiences' },
-        // "Artists" is deliberately absent. It pointed at `/artists`, which is
-        // a Vera route and 404s here — and the artists a member may see are
-        // behind `/private`, so there is nothing public to link to.
-        { href: '/collectors/methodology', label: 'Methodology' },
+        { href: '/collectors/experiences', label: 'Private Experiences' },
+        { href: '/artists', label: 'Artists' },
       ],
     },
     {
@@ -382,4 +361,33 @@ export const methodology = {
     body: 'A private membership that offers collectors a composed way into African contemporary art, translating the work of artists, curators, galleries and advisors into clear intelligence, quiet preparation and well-timed access',
   },
   cta: { label: 'Apply for membership', href: '/collectors/apply' },
+};
+
+export const request = {
+  eyebrow: 'Private request',
+  title: 'Make a Private Request',
+  lede: 'Whether you are enquiring about an artist, a specific work, a private experience, or something else entirely — this is the quiet route',
+  form: {
+    nameLabel: 'Full name',
+    namePlaceholder: 'Your full name',
+    emailLabel: 'Email address',
+    emailPlaceholder: 'For correspondence',
+    typeLabel: 'Type of request',
+    typePlaceholder: 'Select the nature of your enquiry',
+    requestLabel: 'Your request',
+    requestPlaceholder: 'Share what brings you here',
+    types: [
+      { value: 'artist', label: 'Artist enquiry' },
+      { value: 'artwork', label: 'Artwork enquiry' },
+      { value: 'experience', label: 'Private experience request' },
+      { value: 'other', label: 'Something else' },
+    ],
+    submitLabel: 'Send request',
+    submittingLabel: 'Sending…',
+  },
+  received: {
+    title: 'Your request has been received',
+    body: 'Thank you for reaching out. Our team will review your enquiry and be in touch shortly.',
+  },
+  error: 'We could not send your request. Please try again.',
 };
