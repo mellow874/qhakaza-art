@@ -10,13 +10,19 @@ import { Button, Field } from '@qhakaza/shared-ui';
 type Result = { ok: boolean; fieldErrors?: Record<string, string> };
 
 /**
- * Creating an artist account.
+ * Creating a collector account.
  *
- * There is no "what are you joining as" step: this is the artist site, so
- * everyone who signs up here is an artist. The role is set server-side and is
+ * No "what are you joining as" step: this is the collector platform, so
+ * everyone who signs up here is a collector. The role is set server-side and is
  * not part of what the form sends.
  */
-export function SignUpForm({ onSubmit }: { onSubmit: (values: unknown) => Promise<Result> }) {
+export function SignUpForm({
+  onSubmit,
+  callbackUrl,
+}: {
+  onSubmit: (values: unknown) => Promise<Result>;
+  callbackUrl?: string;
+}) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -70,8 +76,12 @@ export function SignUpForm({ onSubmit }: { onSubmit: (values: unknown) => Promis
         return;
       }
 
-      // Straight into building the profile — the next thing they came to do.
-      router.push('/artist/onboarding');
+      /*
+       * Back to wherever they were headed — almost always an invitation link
+       * that bounced them here to sign in. An account grants nothing on its
+       * own, so there is no member area to land on without one.
+       */
+      router.push(callbackUrl ?? '/collectors');
       router.refresh();
     } catch {
       setFormError('We could not create your account. Please try again.');
@@ -91,7 +101,7 @@ export function SignUpForm({ onSubmit }: { onSubmit: (values: unknown) => Promis
             autoComplete="name"
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="As it should appear on your profile"
+            placeholder="As it should appear"
           />
         )}
       </Field>
@@ -128,7 +138,7 @@ export function SignUpForm({ onSubmit }: { onSubmit: (values: unknown) => Promis
       )}
 
       <Button type="submit" size="lg" disabled={pending}>
-        {pending ? 'Creating your account…' : 'Create artist account'}
+        {pending ? 'Creating your account…' : 'Create account'}
       </Button>
     </form>
   );

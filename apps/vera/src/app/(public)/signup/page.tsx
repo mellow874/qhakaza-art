@@ -7,7 +7,7 @@ import { SignUpForm } from '@/features/auth/signup-form';
 
 export const metadata: Metadata = {
   title: 'Create an account',
-  description: 'Join Qhakaza Art Collective as an artist or a collector.',
+  description: 'Create an artist account with Qhakaza Art Collective.',
 };
 
 export default function SignUpPage() {
@@ -15,8 +15,8 @@ export default function SignUpPage() {
     <NarrowPage className="max-w-md">
       <PageHeader
         eyebrow="Join Qhakaza"
-        title="Create an account"
-        intro="Artists build a profile and submit work. Collectors sign in here before opening an invitation to the Collector Intelligence Suite."
+        title="Create your artist account"
+        intro="Build your profile, submit work, and follow it through vetting."
         className="mb-10"
       />
 

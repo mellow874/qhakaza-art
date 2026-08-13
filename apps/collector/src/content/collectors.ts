@@ -20,7 +20,7 @@ export const brand = {
  * without configuration, and is never what production uses because every
  * deployment sets the variable.
  */
-export const VERA_URL = process.env.NEXT_PUBLIC_VERA_URL ?? 'http://localhost:3001';
+export const VERA_URL = process.env.NEXT_PUBLIC_VERA_URL ?? 'https://qhakaza-art-vera.vercel.app/';
 
 /**
  * The navigation labels are the design's. The destinations are the pages that
@@ -166,8 +166,6 @@ export const closing = {
 
 export const footer = {
   tagline: 'A private gateway into carefully vetted emerging African art',
-  // Same principle as NAV: the design's labels, pointing at the sections that
-  // hold the content. The anchors are real element ids on the landing page.
   columns: [
     {
       heading: 'Suite',
@@ -196,6 +194,7 @@ export const footer = {
       links: [
         { href: '/collectors/membership', label: 'Membership' },
         { href: '/collectors/apply', label: 'Begin Intake' },
+        { href: '/collectors/request', label: 'Make a Private Request' },
       ],
     },
   ],
@@ -406,4 +405,33 @@ export const methodology = {
     body: 'A private membership that offers collectors a composed way into African contemporary art, translating the work of artists, curators, galleries and advisors into clear intelligence, quiet preparation and well-timed access',
   },
   cta: { label: 'Apply for membership', href: '/collectors/membership-consideration' },
+};
+
+export const request = {
+  eyebrow: 'Private request',
+  title: 'Make a Private Request',
+  lede: 'Whether you are enquiring about an artist, a specific work, a private experience, or something else entirely — this is the quiet route',
+  form: {
+    nameLabel: 'Full name',
+    namePlaceholder: 'Your full name',
+    emailLabel: 'Email address',
+    emailPlaceholder: 'For correspondence',
+    typeLabel: 'Type of request',
+    typePlaceholder: 'Select the nature of your enquiry',
+    requestLabel: 'Your request',
+    requestPlaceholder: 'Share what brings you here',
+    types: [
+      { value: 'artist', label: 'Artist enquiry' },
+      { value: 'artwork', label: 'Artwork enquiry' },
+      { value: 'experience', label: 'Private experience request' },
+      { value: 'other', label: 'Something else' },
+    ],
+    submitLabel: 'Send request',
+    submittingLabel: 'Sending…',
+  },
+  received: {
+    title: 'Your request has been received',
+    body: 'Thank you for reaching out. Our team will review your enquiry and be in touch shortly.',
+  },
+  error: 'We could not send your request. Please try again.',
 };

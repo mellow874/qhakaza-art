@@ -10,15 +10,18 @@ export type SignUpResult =
   | { ok: false; error: 'INVALID' | 'TAKEN' | 'UNKNOWN'; fieldErrors?: Record<string, string> };
 
 /**
- * Creates an **artist** account.
+ * Creates a **collector** account.
  *
- * The role is fixed here, not carried in the payload. Vera is the artist site
- * and makes artists; collectors sign up on the Collector Platform. A role the
- * browser could choose is a role an attacker could choose, and the previous
- * version's Artist/Collector selector was also a question no visitor to an
- * artist site should have to answer.
+ * The Collector Platform's own sign-up, added when Vera's became artist-only.
+ * A collector needs an account *before* they can open an invitation to
+ * `/private/<token>`, so removing the choice from Vera without putting a door
+ * here would have left invitees with no way in.
+ *
+ * An account is not access. It grants nothing on its own — the private area
+ * still requires a valid invitation token, which only the Command Center
+ * issues. This is a sign-in identity, not a membership.
  */
-export async function signUp(input: unknown): Promise<SignUpResult> {
+export async function signUpCollector(input: unknown): Promise<SignUpResult> {
   const parsed = newAccountSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -39,14 +42,14 @@ export async function signUp(input: unknown): Promise<SignUpResult> {
       };
     }
 
+    // COLLECTOR, fixed here. Never from the payload.
     await prisma.user.create({
-      data: { name, email, role: 'ARTIST', passwordHash: await bcrypt.hash(password, 10) },
+      data: { name, email, role: 'COLLECTOR', passwordHash: await bcrypt.hash(password, 10) },
     });
 
     return { ok: true };
   } catch (error) {
-    // The password is in `parsed.data`; only the error is ever logged.
-    console.error('signUp failed', error);
+    console.error('signUpCollector failed', error);
     return { ok: false, error: 'UNKNOWN' };
   }
 }

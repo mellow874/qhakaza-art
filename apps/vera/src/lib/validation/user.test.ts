@@ -1,42 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { artistProfileSchema, signUpSchema } from './user';
-
-describe('signUpSchema', () => {
-  const valid = {
-    name: 'Thandi Mokoena',
-    email: 'thandi@example.com',
-    password: 'correct-horse-9',
-    role: 'ARTIST',
-  };
-
-  it('accepts a valid artist sign-up', () => {
-    expect(signUpSchema.safeParse(valid).success).toBe(true);
-  });
-
-  it('lowercases and trims the email', () => {
-    const result = signUpSchema.parse({ ...valid, email: '  Thandi@Example.COM ' });
-    expect(result.email).toBe('thandi@example.com');
-  });
-
-  it('rejects a malformed email', () => {
-    expect(signUpSchema.safeParse({ ...valid, email: 'not-an-email' }).success).toBe(false);
-  });
-
-  it('rejects a password shorter than 8 characters', () => {
-    expect(signUpSchema.safeParse({ ...valid, password: 'short7!' }).success).toBe(false);
-  });
-
-  it('refuses to let anyone self-register as ADMIN', () => {
-    const result = signUpSchema.safeParse({ ...valid, role: 'ADMIN' });
-    expect(result.success).toBe(false);
-  });
-
-  it('defaults the role to COLLECTOR', () => {
-    const { role: _role, ...withoutRole } = valid;
-    expect(signUpSchema.parse(withoutRole).role).toBe('COLLECTOR');
-  });
-});
+import { artistProfileSchema } from './user';
 
 describe('artistProfileSchema', () => {
   const valid = {

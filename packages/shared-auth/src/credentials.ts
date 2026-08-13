@@ -20,3 +20,25 @@ export const credentialsSchema = z.object({
 });
 
 export type CredentialsInput = z.infer<typeof credentialsSchema>;
+
+/**
+ * A new account: who they are and how they will sign in.
+ *
+ * Deliberately carries NO role. Each site creates exactly one kind of account
+ * and fixes the role server-side — Vera makes artists, the Collector Platform
+ * makes collectors. A role in the payload would be a role the browser could
+ * choose, which is how a public form becomes a way to enrol yourself as staff.
+ */
+export const newAccountSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(120),
+  email: z
+    .string()
+    .transform((value) => value.trim().toLowerCase())
+    .pipe(z.email('Enter a valid email address')),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(200, 'Password is too long'),
+});
+
+export type NewAccountInput = z.infer<typeof newAccountSchema>;
