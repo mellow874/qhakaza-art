@@ -88,6 +88,7 @@ export const platformPreview = {
     artist: {
       name: 'Marcus Adeyemi',
       detail: 'Lagos, Nigeria · Contemporary Painting',
+      image: '/images/photo-mini-1(1).png',
     },
     works: [
       {
@@ -95,18 +96,21 @@ export const platformPreview = {
         reference: 'QAC-001',
         score: 92,
         status: 'Visibility Ready',
+        image: '/images/photo-mini-2(1).png',
       },
       {
         title: 'Study for Interior No. 3',
         reference: 'QAC-002',
         score: 68,
         status: 'Under Review',
+        image: '/images/photo-mini-3(1).png',
       },
       {
         title: 'Coastal Abstraction, 2024',
         reference: 'QAC-003',
         score: 41,
         status: 'Needs Evidence',
+        image: '/images/photo-mini-4(1).png',
       },
     ],
   },

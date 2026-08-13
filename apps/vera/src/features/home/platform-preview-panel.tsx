@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 import { platformPreview } from '@/content/home';
 
 const { sample } = platformPreview;
@@ -15,8 +17,9 @@ export function PlatformPreviewPanel() {
       className="border-line/70 bg-surface/40 flex flex-col border p-8 sm:p-10"
     >
       <div className="border-line/50 flex items-center gap-4 border-b pb-6">
-        {/* Decorative stand-in for the artist's portrait in the sample record. */}
-        <span className="bg-raised block h-14 w-14 shrink-0 rounded-sm" aria-hidden="true" />
+        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-sm" aria-hidden="true">
+          <Image src={sample.artist.image} alt="" fill className="object-cover" sizes="56px" />
+        </div>
         <div className="flex flex-col gap-1">
           <p className="text-heading text-lg">{sample.artist.name}</p>
           <p className="text-muted text-sm">{sample.artist.detail}</p>
@@ -29,7 +32,9 @@ export function PlatformPreviewPanel() {
             key={work.reference}
             className="border-line/50 flex items-center gap-4 border-b py-5 last:border-b-0"
           >
-            <span className="bg-raised block h-10 w-10 shrink-0 rounded-sm" aria-hidden="true" />
+            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-sm" aria-hidden="true">
+              <Image src={work.image} alt="" fill className="object-cover" sizes="40px" />
+            </div>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <p className="text-heading truncate text-sm">{work.title}</p>
               <p className="text-accent text-xs">{work.reference}</p>
