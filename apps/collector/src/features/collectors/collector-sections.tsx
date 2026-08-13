@@ -18,7 +18,7 @@ export function CollectorHero() {
         <p className="text-body max-w-xl leading-relaxed">{hero.body}</p>
         <p className="text-muted max-w-xl text-sm italic">{hero.note}</p>
 
-        <div className="flex flex-col sm:flex-row gap-4 pt-2">
+        <div className="flex flex-col gap-4 pt-2 sm:flex-row">
           <Link
             href={hero.primaryCta.href}
             className={buttonStyles({ size: 'lg', className: 'caps' })}
@@ -36,7 +36,7 @@ export function CollectorHero() {
         <p className="text-muted mt-4 max-w-xl text-sm italic">{hero.membershipNote}</p>
       </div>
 
- <div className="relative min-h-[22rem] lg:min-h-screen">
+      <div className="relative min-h-[22rem] lg:min-h-screen">
         <EditorialImage
           src={IMAGES['collector-hero']}
           alt={hero.imageAlt}
@@ -45,7 +45,6 @@ export function CollectorHero() {
           className="absolute inset-0 h-full w-full object-cover object-right"
         />
       </div>
-   
     </section>
   );
 }

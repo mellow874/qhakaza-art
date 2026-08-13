@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useRef, useState } from 'react';
 
-import { Button, Field, cn } from '@qhakaza/shared-ui';
+import { Button, Field, buttonStyles, cn } from '@qhakaza/shared-ui';
 import { apply } from '@/content/collectors';
 import { collectorApplicationSchema } from '@/lib/validation/collector';
 
@@ -117,6 +118,23 @@ export function CollectorApplyForm({
       <div role="status" className="border-line/70 bg-surface flex flex-col gap-3 border p-10">
         <p className="font-display text-heading text-2xl">{apply.received.title}</p>
         <p className="text-body text-sm leading-relaxed">{apply.received.body}</p>
+
+        {/* The entry point into the Private Note. Offered once the intake is
+            done, because that is the moment it is for — and left clearly
+            optional. */}
+        <div className="border-line/70 mt-6 flex flex-col gap-4 border-t pt-6">
+          <p className="text-body text-sm leading-relaxed">{apply.received.nextStep.body}</p>
+          <Link
+            href={apply.received.nextStep.href}
+            className={buttonStyles({
+              variant: 'outline',
+              size: 'md',
+              className: 'caps self-start',
+            })}
+          >
+            {apply.received.nextStep.label}
+          </Link>
+        </div>
       </div>
     );
   }

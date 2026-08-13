@@ -15,6 +15,8 @@ const PUBLIC_PAGES = [
   '/collectors/membership',
   '/collectors/methodology',
   '/collectors/apply',
+  '/collectors/request-access',
+  '/collectors/membership-consideration',
 ];
 
 test('no page in the public shell renders a link that 404s', async ({ page, request }) => {

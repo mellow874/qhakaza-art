@@ -7,15 +7,10 @@ import {
   setNoteStatus,
   setUserRole,
 } from '@/features/command-center/actions';
+import { cn } from '@qhakaza/shared-ui';
+
 import { ActionButton } from '@/features/command-center/action-button';
-import type {
-  getAnalytics,
-  getAuditTrail,
-  getCommunications,
-  getIntakeQueue,
-  getPeople,
-  getVettingQueue,
-} from '@/features/command-center/queries';
+import type { CommandCentreData } from '@/features/command-center/queries';
 
 /**
  * AdminCommandCenter — the admin hub.
@@ -33,15 +28,15 @@ import type {
  * design arrives.
  */
 
-type Props = {
+/**
+ * Everything the console renders, plus who is looking at it.
+ *
+ * The data half is `CommandCentreData`, so this list cannot drift from what the
+ * single page query actually returns.
+ */
+type Props = CommandCentreData & {
   actorRole: 'ADMIN' | 'ADVISOR';
   actorId: string;
-  vetting: Awaited<ReturnType<typeof getVettingQueue>>;
-  intakes: Awaited<ReturnType<typeof getIntakeQueue>>;
-  comms: Awaited<ReturnType<typeof getCommunications>>;
-  analytics: Awaited<ReturnType<typeof getAnalytics>>;
-  people: Awaited<ReturnType<typeof getPeople>>;
-  audit: Awaited<ReturnType<typeof getAuditTrail>>;
 };
 
 function Panel({
@@ -66,6 +61,13 @@ function Panel({
   );
 }
 
+/** The three collector journeys, in the words the site uses for them. */
+const INTAKE_KIND_LABEL: Record<string, string> = {
+  INTAKE: 'Intake',
+  ACCESS_REQUEST: 'Access request',
+  MEMBERSHIP_CONSIDERATION: 'Consideration',
+};
+
 function Empty({ children }: { children: string }) {
   return <p className="text-muted text-sm">{children}</p>;
 }
@@ -84,6 +86,7 @@ export function AdminCommandCenter({
   vetting,
   intakes,
   comms,
+  privateNotes,
   analytics,
   people,
   audit,
@@ -157,7 +160,7 @@ export function AdminCommandCenter({
       <Panel
         id="intakes"
         title="Collector intake"
-        note="Verify an applicant, then issue the invitation that unlocks their private area."
+        note="All three collector journeys arrive here, labelled by which one produced them. Verify an applicant, then issue the invitation that unlocks their private area."
       >
         {intakes.length === 0 ? (
           <Empty>No applications yet.</Empty>
@@ -169,8 +172,15 @@ export function AdminCommandCenter({
 
               return (
                 <Row key={intake.id}>
-                  <span className="flex flex-col">
-                    <span className="text-heading">{intake.fullName}</span>
+                  <span className="flex max-w-xl flex-col gap-1">
+                    <span className="flex flex-wrap items-center gap-3">
+                      {/* Which of the three journeys produced this row. Without
+                          it all three look identical in the queue. */}
+                      <span className="border-line-strong text-muted caps border px-2 py-1">
+                        {INTAKE_KIND_LABEL[intake.kind]}
+                      </span>
+                      <span className="text-heading">{intake.fullName}</span>
+                    </span>
                     <span className="text-muted text-xs">
                       {[intake.city, intake.country].filter(Boolean).join(', ') ||
                         'Location not given'}
@@ -178,6 +188,12 @@ export function AdminCommandCenter({
                       {intake.verification?.outcome ?? 'not yet vetted'}
                       {invitation && ` · invitation ${invitation.status.toLowerCase()}`}
                     </span>
+                    {intake.accessInterest && (
+                      <span className="text-body text-sm">{intake.accessInterest}</span>
+                    )}
+                    {intake.considerationNote && (
+                      <span className="text-body text-sm">{intake.considerationNote}</span>
+                    )}
                   </span>
 
                   <span className="flex flex-wrap items-start gap-3">
@@ -271,6 +287,66 @@ export function AdminCommandCenter({
                   <span className="text-muted text-xs">
                     {message.name} · {message.email}
                   </span>
+                </span>
+              </Row>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel
+        id="private-notes"
+        title="Private Notes"
+        note="What prospective collectors told us they are drawn to. Read these before preparing anything for them — that is what they are for."
+      >
+        {privateNotes.length === 0 ? (
+          <Empty>No notes yet.</Empty>
+        ) : (
+          <ul className="flex flex-col">
+            {privateNotes.map((note) => (
+              <Row key={note.id}>
+                <span className="flex max-w-2xl flex-col gap-2">
+                  <span className="flex flex-wrap items-center gap-3">
+                    <span className="text-heading">{note.fullName}</span>
+                    <span className="text-muted text-xs">{note.email}</span>
+                    {/* Whether we may write back is the first thing an advisor
+                        needs to know, so it is not buried in the detail. */}
+                    <span
+                      className={cn(
+                        'caps border px-2 py-1',
+                        note.mayContact
+                          ? 'border-accent text-accent-ink'
+                          : 'border-line-strong text-muted',
+                      )}
+                    >
+                      {note.mayContact ? 'May contact' : 'No contact consent'}
+                    </span>
+                  </span>
+
+                  {(note.mediums.length > 0 || note.regions.length > 0) && (
+                    <span className="text-muted text-xs">
+                      {[...note.mediums, ...note.regions].join(' · ')}
+                    </span>
+                  )}
+
+                  <span className="text-muted text-xs">
+                    {[
+                      note.acquisitionPace && `pace: ${note.acquisitionPace}`,
+                      note.budgetBand && `range: ${note.budgetBand}`,
+                      note.advisoryStyle && `guidance: ${note.advisoryStyle}`,
+                      note.contactStyle && `contact: ${note.contactStyle}`,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || 'No preferences given'}
+                  </span>
+
+                  {[note.subjects, note.building, note.frustrations, note.goodOutcome]
+                    .filter(Boolean)
+                    .map((text) => (
+                      <span key={text} className="text-body text-sm leading-relaxed">
+                        {text}
+                      </span>
+                    ))}
                 </span>
               </Row>
             ))}

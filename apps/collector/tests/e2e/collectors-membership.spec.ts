@@ -53,7 +53,7 @@ test('sets out the annual rhythm and how access is considered', async ({ page })
   await expect(access.getByText(/begins with a short collector intake/i)).toBeVisible();
 });
 
-test('both requests lead into the intake, not a checkout', async ({ page }) => {
+test('both requests lead to consideration, not to a checkout or the intake', async ({ page }) => {
   await page.goto('/collectors/membership', { waitUntil: 'domcontentloaded' });
 
   const requests = page.getByRole('link', { name: /request membership consideration/i });
@@ -61,7 +61,9 @@ test('both requests lead into the intake, not a checkout', async ({ page }) => {
   for (const href of await requests.evaluateAll((links) =>
     links.map((link) => link.getAttribute('href')),
   )) {
-    expect(href).toBe('/collectors/apply');
+    // Not /collectors/apply: someone who cannot meet the fee should not be
+    // dropped into full onboarding, which asks for their income band.
+    expect(href).toBe('/collectors/membership-consideration');
   }
 
   await expect(

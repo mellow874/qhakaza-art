@@ -83,7 +83,12 @@ test('the footer groups links under Suite, Discover and Access', async ({ page }
   }
 });
 
-test('every call to action leads into the intake', async ({ page }) => {
+test('the three journeys lead to three different places', async ({ page }) => {
+  /*
+   * These used to converge: every CTA on the site pointed at /collectors/apply,
+   * so "Request access" silently started full onboarding. They are three
+   * different asks and must stay three different destinations.
+   */
   await page.goto('/collectors', { waitUntil: 'domcontentloaded' });
 
   await expect(page.getByRole('link', { name: /begin collector intake/i }).first()).toHaveAttribute(
@@ -94,6 +99,16 @@ test('every call to action leads into the intake', async ({ page }) => {
   // Scoped to the experience section: the footer carries its own "Request Access".
   const experience = page.getByRole('region', { name: /private collector dinner/i });
   await expect(experience.getByRole('link', { name: /request access/i })).toHaveAttribute(
+    'href',
+    '/collectors/request-access',
+  );
+
+  const footer = page.getByRole('contentinfo');
+  await expect(footer.getByRole('link', { name: 'Request Access' })).toHaveAttribute(
+    'href',
+    '/collectors/request-access',
+  );
+  await expect(footer.getByRole('link', { name: 'Begin Intake' })).toHaveAttribute(
     'href',
     '/collectors/apply',
   );

@@ -12,6 +12,17 @@ export const brand = {
 };
 
 /**
+ * Vera — the artist website. A different application on a different domain, so
+ * it cannot be reached with a path.
+ *
+ * `NEXT_PUBLIC_` because the footer is rendered on the client too; the value is
+ * inlined at build time. The localhost fallback keeps development working
+ * without configuration, and is never what production uses because every
+ * deployment sets the variable.
+ */
+export const VERA_URL = process.env.NEXT_PUBLIC_VERA_URL ?? 'http://localhost:3001';
+
+/**
  * The navigation labels are the design's. The destinations are the pages that
  * actually exist.
  *
@@ -131,7 +142,7 @@ export const experience = {
     'Curated collector education',
     'Private acquisition conversations',
   ],
-  cta: { label: 'Request access', href: '/collectors/apply' },
+  cta: { label: 'Request access', href: '/collectors/request-access' },
   imageAlt:
     'Guests at a candlelit dinner table while a host speaks, surrounded by African artworks',
 };
@@ -161,10 +172,11 @@ export const footer = {
     {
       heading: 'Suite',
       links: [
-        { href: '/collectors#intelligence-preview', label: 'Artist Intelligence' },
+        // The artist site itself, not the preview of its records on this page.
+        { href: VERA_URL, label: 'Artist Intelligence' },
         { href: '/collectors#intelligence-preview', label: 'Artwork Intelligence' },
         { href: '/collectors#what-you-receive', label: 'Intelligence' },
-        { href: '/collectors/apply', label: 'Request Access' },
+        { href: '/collectors/request-access', label: 'Request Access' },
       ],
     },
     {
@@ -301,6 +313,15 @@ export const apply = {
   received: {
     title: 'Your intake has been received',
     body: 'Qhakaza has your details. The verification step follows, and we will be in touch to arrange it.',
+    // The Private Note is offered here because this is the moment it is for:
+    // the intake captures who someone is, the note captures what they are
+    // drawn to, and everything prepared for them afterwards is shaped by it.
+    // Optional, and framed as such — it is a note, not another form to clear.
+    nextStep: {
+      label: 'Write your Private Note',
+      href: '/collectors/private-note',
+      body: 'If you have a few more quiet minutes, tell us what you are drawn to. It shapes what we prepare for you.',
+    },
   },
   error: 'We could not save your application. Please try again.',
 };
@@ -315,7 +336,7 @@ export const membership = {
     label: 'Annual membership consideration',
     note: 'For collectors seeking a serious, guided route into African contemporary art.',
   },
-  cta: { label: 'Request membership consideration', href: '/collectors/apply' },
+  cta: { label: 'Request membership consideration', href: '/collectors/membership-consideration' },
   rhythmNote: {
     title: "The club is built around the collector's time",
     body: 'The calendar is kept intentionally light. What matters is not frequency, but the quality of the moments, the access around them, and the continuity that follows',
@@ -347,7 +368,10 @@ export const membership = {
     eyebrow: 'Request membership consideration',
     title: 'The route begins with a conversation, not a checkout.',
     body: 'Begin with a short collector intake. It takes a few quiet minutes and shapes everything that follows.',
-    cta: { label: 'Request membership consideration', href: '/collectors/apply' },
+    cta: {
+      label: 'Request membership consideration',
+      href: '/collectors/membership-consideration',
+    },
   },
 };
 
@@ -381,5 +405,5 @@ export const methodology = {
     eyebrow: 'In essence',
     body: 'A private membership that offers collectors a composed way into African contemporary art, translating the work of artists, curators, galleries and advisors into clear intelligence, quiet preparation and well-timed access',
   },
-  cta: { label: 'Apply for membership', href: '/collectors/apply' },
+  cta: { label: 'Apply for membership', href: '/collectors/membership-consideration' },
 };
