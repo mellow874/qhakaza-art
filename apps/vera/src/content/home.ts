@@ -1,5 +1,4 @@
 /**
-
  *
  * Content is kept separate from components so wording and media references
  * can be edited without touching layout or application logic.
@@ -58,7 +57,7 @@ export const framework = {
   quote: 'The problem is not the absence of quality.',
   quoteEmphasis: 'It is the absence of structure.',
   imageAlt: 'A painting installation with layered surfaces and a strong gallery atmosphere.',
-  video: '/videos/home1.mp4',
+  video: '/videos/home3.mp4',
 };
 
 export const sxScore = {
@@ -94,7 +93,7 @@ export const platformPreview = {
     'Provenance narrative on record',
   ],
 
-  image: '/images/about1.jpeg',
+  image: '/images/artist3.jpeg',
   video: '/videos/home1.mp4',
 
   // Illustrative record shown in the design, not live data.
@@ -145,7 +144,7 @@ export const begin = {
     href: '/about',
   },
 
-  image: '/images/artist1.jpeg',
+  image: '/images/about1.jpeg',
   imageAlt: 'A worn paintbrush resting on a painted wooden surface',
   video: '/videos/home1.mp4',
 };

@@ -2,6 +2,7 @@ export const IMAGES = {
   hero: '/images/about1.jpeg',
   framework: '/images/about1.jpeg',
   begin: '/images/artist1.jpeg',
+   home1: '/images/about1.jpeg', 
   aboutDocuments: '/images/about1.jpeg',
 
   'briefing-when-art-becomes-an-asset': '/images/briefing1.jpg',
@@ -17,7 +18,6 @@ export const IMAGES = {
 } as const;
 
 export const VIDEOS = {
-  hero: '/videos/home1.mp4',
-  home: '/videos/home1.mp4',
-  home1: '/videos/home1.mp4',
+  video: '/videos/home1.mp4',
+  home: '/videos/home3.mp4',
 } as const;

@@ -5,7 +5,6 @@ import { SectionHeading } from '@/components/section-heading';
 import { briefings as briefingItems, homeStrip } from '@/content/briefings';
 import { artistNeeds, begin, framework, hero, platformPreview } from '@/content/home';
 import { BriefingCard } from '@/features/briefings/briefing-card';
-import { IMAGES } from '@/content/images';
 
 export function Hero() {
   return (
@@ -93,8 +92,7 @@ export function FrameworkQuote() {
         <source src={framework.video} type="video/mp4" />
       </video>
       {/* Darkened so the quote keeps its contrast over a busy painting. */}
-      <div className="bg-canvas/80 absolute inset-0 -z-10" aria-hidden="true" />
-
+{/* <div className="bg-canvas/85 absolute inset-0 -z-10" aria-hidden="true" /> */}
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-32 lg:py-40">
         <p className="eyebrow">{framework.eyebrow}</p>
         <span className="rule" aria-hidden="true" />
@@ -136,26 +134,35 @@ export function EvidenceFramework({ panel }: { panel: React.ReactNode }) {
 
 export function PlatformPreview({ panel }: { panel: React.ReactNode }) {
   return (
-    <section aria-labelledby="platform-preview" className="mx-auto w-full max-w-7xl px-6">
-      <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
-        <div className="flex flex-col gap-10">
-          <SectionHeading
-            eyebrow={platformPreview.eyebrow}
-            title={platformPreview.title}
-            id="platform-preview"
-          />
-          <p className="text-body max-w-xl leading-relaxed">{platformPreview.description}</p>
+    <section aria-labelledby="platform-preview" className="relative isolate overflow-hidden">
+      <img
+        src={platformPreview.image}
+        alt="Detail of an artist's structured record on the platform"
+        className="absolute inset-0 -z-10 h-full w-full object-cover"
+      />
+      <div className="bg-canvas/85 absolute inset-0 -z-10" aria-hidden="true" />
 
-          <ul className="flex flex-col gap-4">
-            {platformPreview.checklist.map((item) => (
-              <li key={item} className="border-accent/70 text-body border-l-2 pl-5 text-sm">
-                {item}
-              </li>
-            ))}
-          </ul>
+      <div className="mx-auto w-full max-w-7xl px-6">
+        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-20">
+          <div className="flex flex-col gap-10">
+            <SectionHeading
+              eyebrow={platformPreview.eyebrow}
+              title={platformPreview.title}
+              id="platform-preview"
+            />
+            <p className="text-body max-w-xl leading-relaxed">{platformPreview.description}</p>
+
+            <ul className="flex flex-col gap-4">
+              {platformPreview.checklist.map((item) => (
+                <li key={item} className="border-accent/70 text-body border-l-2 pl-5 text-sm">
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {panel}
         </div>
-
-        {panel}
       </div>
     </section>
   );
@@ -227,4 +234,4 @@ export function Begin() {
       </div>
     </section>
   );
-}
+}begin
