@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * The two collector journeys that are not full onboarding.
+ * The collector journey that is not full onboarding.
  *
  * Kept out of the server-action files: a `"use server"` module may only export
  * async functions, and the client forms validate against these same schemas so
@@ -20,24 +20,6 @@ const optionalText = (max: number) =>
     .max(max)
     .transform((value) => (value === '' ? undefined : value))
     .optional();
-
-/**
- * Request Access — a preview window, offered *after* onboarding.
- *
- * Only an email and what they would like to see. The precondition is checked
- * server-side by looking for a completed intake against that address; asking
- * again for everything they already told us would be the wrong shape entirely.
- */
-export const accessRequestSchema = z.object({
-  email,
-  accessInterest: z
-    .string()
-    .trim()
-    .min(10, 'Tell us a little about what you would like to see')
-    .max(2_000),
-});
-
-export type AccessRequestInput = z.infer<typeof accessRequestSchema>;
 
 /**
  * Membership Consideration — for someone who cannot currently meet the fee.

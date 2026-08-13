@@ -4,13 +4,13 @@ import { useRef, useState } from 'react';
 
 import { Button, Field, cn } from '@qhakaza/shared-ui';
 
-import { accessRequestSchema, considerationSchema } from '@/lib/validation/journeys';
+import { considerationSchema } from '@/lib/validation/journeys';
 
 /**
- * The two shorter collector journeys.
+ * Membership Consideration — the shorter collector journey.
  *
- * Both reuse the collector suite's field styling — caps labels, hairline
- * underlines, `*` on required — so they read as the same site as the intake,
+ * Reuses the collector suite's field styling — caps labels, hairline
+ * underlines, `*` on required — so it reads as the same site as the intake,
  * without being the intake.
  */
 
@@ -32,112 +32,6 @@ function Alert({ children }: { children: React.ReactNode }) {
     <p role="alert" className="border-danger/30 bg-danger/5 text-danger border p-4 text-sm">
       {children}
     </p>
-  );
-}
-
-// ---------------------------------------------------------------------------
-
-export function RequestAccessForm({
-  onSubmit,
-}: {
-  onSubmit: (values: unknown) => Promise<Result>;
-}) {
-  const [email, setEmail] = useState('');
-  const [accessInterest, setAccessInterest] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<React.ReactNode>(null);
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
-  const inFlight = useRef(false);
-
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    if (inFlight.current) return;
-    setFormError(null);
-
-    const parsed = accessRequestSchema.safeParse({ email, accessInterest });
-    if (!parsed.success) {
-      const next: Record<string, string> = {};
-      for (const issue of parsed.error.issues) next[issue.path.join('.')] ??= issue.message;
-      setErrors(next);
-      return;
-    }
-
-    setErrors({});
-    inFlight.current = true;
-    setSending(true);
-
-    try {
-      const result = await onSubmit(parsed.data);
-      if (result.ok) {
-        setSent(true);
-      } else if (result.error === 'NO_INTAKE') {
-        // Said plainly, with the way forward — the precondition is real, and
-        // hiding it would leave someone stuck with no idea why.
-        setFormError(
-          <>
-            We have no completed intake for that address. Access follows onboarding —{' '}
-            <a href="/collectors/apply" className="underline underline-offset-4">
-              begin your intake
-            </a>{' '}
-            first.
-          </>,
-        );
-      } else if (result.fieldErrors) {
-        setErrors(result.fieldErrors);
-      } else {
-        setFormError('We could not send your request. Please try again.');
-      }
-    } catch {
-      setFormError('We could not send your request. Please try again.');
-    } finally {
-      inFlight.current = false;
-      setSending(false);
-    }
-  }
-
-  if (sent) {
-    return (
-      <Received
-        title="Your request has been received"
-        body="Your advisor will open a preview window and be in touch with what it includes."
-      />
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit} noValidate className="flex max-w-2xl flex-col gap-10">
-      <Field {...FIELD} label="Email address" error={errors.email} required>
-        {(fieldProps) => (
-          <input
-            {...fieldProps}
-            type="email"
-            autoComplete="email"
-            placeholder="The address you onboarded with"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-        )}
-      </Field>
-
-      <Field {...FIELD} label="What would you like to see" error={errors.accessInterest} required>
-        {({ className, ...fieldProps }) => (
-          <textarea
-            {...fieldProps}
-            className={cn(className, 'min-h-32 resize-y leading-relaxed')}
-            placeholder="An artist, a medium, a question you are weighing"
-            value={accessInterest}
-            onChange={(event) => setAccessInterest(event.target.value)}
-          />
-        )}
-      </Field>
-
-      {formError && <Alert>{formError}</Alert>}
-
-      <Button type="submit" size="lg" disabled={sending} className="caps self-start">
-        {sending ? 'Sending…' : 'Request access'}
-      </Button>
-    </form>
   );
 }
 

@@ -15,7 +15,7 @@ const PUBLIC_PAGES = [
   '/collectors/membership',
   '/collectors/methodology',
   '/collectors/apply',
-  '/collectors/request-access',
+  '/collectors/request',
   '/collectors/membership-consideration',
 ];
 

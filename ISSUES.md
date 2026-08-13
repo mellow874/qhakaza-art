@@ -61,6 +61,22 @@ Private Notes, Analytics, Access & permissions, Audit trail.
 That order is a **sensible default, pending founder input** — it puts the work
 queues first and the reference material last. Reordering is moving JSX blocks.
 
+### B7 — No privacy policy or terms of service
+
+Vera's footer has linked to `/privacy` and `/terms` since the design was
+transcribed. Neither route existed, so both 404'd from every page on the site —
+caught by the new `links.spec.ts`, not by any earlier test.
+
+Both now render an honest placeholder saying the document is being prepared,
+marked `noindex`. The text itself is **not** written: a privacy policy and
+terms of service are legal instruments describing what this business actually
+does with personal data and on what terms it trades. Inventing them would state
+obligations the company has not agreed to, and visitors would rely on it.
+
+Needs: the real documents, from whoever advises Qhakaza on this. Then replace
+`LegalPlaceholder` in the two routes. The collector app has no such links yet
+and will need the same pair before launch.
+
 ### B5 — Provisional financial bands
 
 Two sets of money bands are stand-ins, not Qhakaza's segmentation, and are
@@ -90,44 +106,24 @@ merged deliberately rather than by side effect.
 
 ## Open — deferred to a later phase
 
-### I1 — Sign-up asks "I am joining as"
+### I2 — Photography is partly supplied
 
-The Vera sign-up form offers an Artist/Collector choice. The new brief says
-sign-in should identify the user **simply as an artist**.
+Six of the nine entries in
+[`apps/vera/src/content/images.ts`](apps/vera/src/content/images.ts) now have
+assets, plus four on the home page. The remaining three — `collector-hero`,
+`collector-belief`, `collector-experience` — are still `null`, as are the
+collector app's own three. `EditorialImage` renders a tinted block of the
+correct dimensions, so nothing is broken or 404s.
 
-These conflict for a real reason: a collector needs an account **before** they
-can open an invitation to `/private/<token>`, and Vera is the only site with
-public sign-up.
+The supplied files are named `photo-1(1).png`, `photo-3.jpg` and so on. They
+work, but the parentheses and the `(1)` suffix should be renamed to something
+descriptive before launch.
 
-Options: (a) drop the choice on Vera and give the Collector Platform its own
-sign-up; (b) keep it. Needs a decision — see the Phase 0 report.
+### I9 — Vera has no sitemap or robots.txt
 
-### I2 — Photography is entirely placeholder
-
-All 9 entries in [`apps/vera/src/content/images.ts`](apps/vera/src/content/images.ts)
-are `null`. `EditorialImage` renders a tinted block of the correct dimensions,
-so nothing is broken or 404s — but no real photograph is present anywhere on
-Vera. The collector app's three images are the same.
-
-### I3 — Six placeholder pages remain
-
-`PhaseZeroStub` renders a title and nothing else on:
-`/browse`, `/artists`, `/artists/[slug]`, `/art/[id]`, `/artist/dashboard`
-(Vera), plus `/forbidden` which is legitimately minimal.
-
-`/artist/dashboard` is the significant one: an artist can sign in and complete a
-profile, then lands on a placeholder.
-
-### I4 — Artists cannot submit artwork through the UI
-
-The Command Center can vet and release artwork, and the pipeline is tested — but
-there is no artwork submission form in Vera. Work has to be created directly in
-the database.
-
-### I5 — Individual briefing articles 404
-
-`/briefings` lists articles linking to `/briefings/<slug>`, which does not
-exist. Only excerpts were supplied, never article bodies.
+The collector app serves both; Vera serves neither. Vera is the public-facing
+marketing site of the two, so it is the one that wants them more. Not a bug —
+nothing is broken — but it should exist before launch.
 
 ### I6 — No email anywhere
 
@@ -167,3 +163,42 @@ both a root `postinstall` and each app's `build`.
 
 Loading the console opened one interactive transaction per query, exhausting a
 pooled connection and failing with `P2028`. Now one transaction for the page.
+
+### C5 — Sign-up asked "I am joining as" — **fixed**
+
+Was I1. Resolved as option (a): the role selector is gone. Vera's sign-up makes
+artists and nothing else, the Collector Platform has its own sign-up that makes
+collectors, and each fixes the role server-side. A crafted request naming
+another role is ignored — tested on both sites.
+
+### C6 — Six placeholder pages — **fixed**
+
+Was I3. `/browse`, `/artists`, `/artists/[slug]` and `/art/[id]` are now real
+catalogue pages reading from the database through `PUBLICLY_VISIBLE_WORK`, so
+nothing unreleased or unapproved can reach them. `/forbidden` is a proper
+page rather than a scaffold, and `/artist/dashboard` became the artist's studio.
+`PhaseZeroStub` is deleted — there is nothing left for it to render.
+
+### C7 — Artists could not submit artwork — **fixed**
+
+Was I4. `/artist/work/new` saves a work as DRAFT against the signed-in artist's
+profile. Release stays with the Command Center: there is deliberately no path
+from the form to LISTED. Images are URLs, not uploads — no storage provider is
+configured.
+
+### C8 — Every briefing link 404'd — **fixed**
+
+Was I5. `/briefings/<slug>` now exists and is prerendered from the content list.
+The article bodies were never supplied, so the page shows the excerpt we have
+and says the full text is being prepared rather than inventing market claims.
+`links.spec.ts` on Vera now walks every internal link and opens every briefing,
+so this class of bug fails the build instead of shipping.
+
+### C9 — Two competing "Request Access" flows — **fixed**
+
+The merge brought a second request form. Both were kept briefly, then resolved
+on the founder's instruction: the general private request form
+(`/collectors/request` → `ContactMessage`) is the one, and the gated
+`/collectors/request-access` flow was removed along with its action, schema,
+form and tests. `CollectorIntakeKind.ACCESS_REQUEST` stays in the schema
+because rows written by the old form still carry it.

@@ -1,26 +1,32 @@
 'use server';
 
-import { prisma, withActor } from '@qhakaza/shared-db';
+import { prisma } from '@qhakaza/shared-db';
 
-import { accessRequestSchema, considerationSchema } from '@/lib/validation/journeys';
+import { considerationSchema } from '@/lib/validation/journeys';
 
 /**
- * The two collector journeys that are not full onboarding.
+ * Membership Consideration — the collector journey that is neither full
+ * onboarding nor a general enquiry.
  *
- * Both write to `CollectorIntake` with a `kind` that says which journey
- * produced them, so all three arrive in one queue for the same people to work,
- * without three near-identical tables to keep in step.
+ * Writes to `CollectorIntake` with a `kind` that says which journey produced
+ * it, so it arrives in the same queue as onboarding for the same people to
+ * work, without near-identical tables to keep in step.
  *
- * `createMany` throughout, not `create`: under RLS this table is write-only for
- * the public, and `create()` issues INSERT ... RETURNING, which needs a SELECT
- * the policy does not grant.
+ * `createMany`, not `create`: under RLS this table is write-only for the
+ * public, and `create()` issues INSERT ... RETURNING, which needs a SELECT the
+ * policy does not grant.
+ *
+ * Request Access used to live here too, gated on having onboarded. It was
+ * retired in favour of the general private request form, which is a single
+ * route for every kind of enquiry. `CollectorIntakeKind.ACCESS_REQUEST` is left
+ * in the schema: rows written by the old form still carry it.
  */
 
 export type JourneyResult =
   | { ok: true }
   | {
       ok: false;
-      error: 'INVALID' | 'NO_INTAKE' | 'UNKNOWN';
+      error: 'INVALID' | 'UNKNOWN';
       fieldErrors?: Record<string, string>;
     };
 
@@ -28,59 +34,6 @@ function fieldErrorsOf(issues: { path: PropertyKey[]; message: string }[]) {
   const fieldErrors: Record<string, string> = {};
   for (const issue of issues) fieldErrors[issue.path.join('.')] ??= issue.message;
   return fieldErrors;
-}
-
-/**
- * Request Access — the preview window, gated on having onboarded.
- *
- * The precondition is real, not decorative: we look for an existing intake
- * against the address given. No account is required, which suits a public page,
- * but someone who has never onboarded is told so rather than quietly queued.
- */
-export async function requestAccess(input: unknown): Promise<JourneyResult> {
-  const parsed = accessRequestSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: 'INVALID', fieldErrors: fieldErrorsOf(parsed.error.issues) };
-  }
-
-  const { email, accessInterest } = parsed.data;
-
-  try {
-    /*
-     * Reading CollectorIntake needs staff rights — the public cannot read this
-     * table, by policy. `advisor` is used for the existence check only, and the
-     * only thing that leaves this block is a boolean: no intake data is
-     * returned to the caller, so the check cannot be turned into a way of
-     * reading someone else's application.
-     */
-    const hasOnboarded = await withActor({ role: 'advisor' }, async (tx) => {
-      const found = await tx.collectorIntake.findFirst({
-        where: { email, kind: 'INTAKE' },
-        select: { id: true },
-      });
-      return found !== null;
-    });
-
-    if (!hasOnboarded) return { ok: false, error: 'NO_INTAKE' };
-
-    await prisma.collectorIntake.createMany({
-      data: [
-        {
-          kind: 'ACCESS_REQUEST',
-          // Carried forward so the row is self-describing in the queue; the
-          // name is not asked for again.
-          fullName: email,
-          email,
-          accessInterest,
-        },
-      ],
-    });
-
-    return { ok: true };
-  } catch (error) {
-    console.error('requestAccess failed', error);
-    return { ok: false, error: 'UNKNOWN' };
-  }
 }
 
 /** Membership Consideration — a request to be considered without the fee. */

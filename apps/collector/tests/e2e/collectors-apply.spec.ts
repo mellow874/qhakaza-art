@@ -84,12 +84,12 @@ test('every collector page leads here', async ({ page }) => {
     // page. The membership and methodology pages lead to consideration, the
     // rest to the intake.
     const journeys = page.locator(
-      'main a[href="/collectors/apply"], main a[href="/collectors/request-access"], main a[href="/collectors/membership-consideration"]',
+      'main a[href="/collectors/apply"], main a[href="/collectors/request"], main a[href="/collectors/membership-consideration"]',
     );
     expect(await journeys.count(), `${from} offers no collector journey`).toBeGreaterThan(0);
 
     await journeys.first().click();
-    await expect(page).toHaveURL(/\/collectors\/(apply|request-access|membership-consideration)$/);
+    await expect(page).toHaveURL(/\/collectors\/(apply|request|membership-consideration)$/);
   }
 });
 

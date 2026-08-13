@@ -100,13 +100,13 @@ test('the three journeys lead to three different places', async ({ page }) => {
   const experience = page.getByRole('region', { name: /private collector dinner/i });
   await expect(experience.getByRole('link', { name: /request access/i })).toHaveAttribute(
     'href',
-    '/collectors/request-access',
+    '/collectors/request',
   );
 
   const footer = page.getByRole('contentinfo');
   await expect(footer.getByRole('link', { name: 'Request Access' })).toHaveAttribute(
     'href',
-    '/collectors/request-access',
+    '/collectors/request',
   );
   await expect(footer.getByRole('link', { name: 'Begin Intake' })).toHaveAttribute(
     'href',

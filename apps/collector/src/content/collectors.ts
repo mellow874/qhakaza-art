@@ -142,7 +142,7 @@ export const experience = {
     'Curated collector education',
     'Private acquisition conversations',
   ],
-  cta: { label: 'Request access', href: '/collectors/request-access' },
+  cta: { label: 'Request access', href: '/collectors/request' },
   imageAlt:
     'Guests at a candlelit dinner table while a host speaks, surrounded by African artworks',
 };
@@ -174,7 +174,7 @@ export const footer = {
         { href: VERA_URL, label: 'Artist Intelligence' },
         { href: '/collectors#intelligence-preview', label: 'Artwork Intelligence' },
         { href: '/collectors#what-you-receive', label: 'Intelligence' },
-        { href: '/collectors/request-access', label: 'Request Access' },
+        { href: '/collectors/request', label: 'Request Access' },
       ],
     },
     {
@@ -194,7 +194,6 @@ export const footer = {
       links: [
         { href: '/collectors/membership', label: 'Membership' },
         { href: '/collectors/apply', label: 'Begin Intake' },
-        { href: '/collectors/request', label: 'Make a Private Request' },
       ],
     },
   ],
