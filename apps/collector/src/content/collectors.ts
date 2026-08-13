@@ -115,7 +115,7 @@ export const experience = {
     'Curated collector education',
     'Private acquisition conversations',
   ],
-  cta: { label: 'Request access', href: '/collectors/apply' },
+  cta: { label: 'Request access', href: '/collectors/request' },
   imageAlt:
     'Guests at a candlelit dinner table while a host speaks, surrounded by African artworks',
 };
