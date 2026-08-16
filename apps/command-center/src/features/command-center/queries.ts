@@ -246,9 +246,83 @@ async function invitations(tx: Tx) {
   });
 }
 
+/**
+ * The dashboard figures, every one counted from the underlying records.
+ *
+ * Nothing here is a stored total. Section 16 asks for live database state, and
+ * a maintained counter is a number that can be wrong; a COUNT cannot.
+ *
+ * KPIs are defined as a list rather than written into the JSX, so adding one
+ * is an entry here and not a redevelopment - which is what section 17's
+ * "design so new KPIs can be added without major redevelopment" asks for.
+ */
+async function dashboard(tx: Tx) {
+  const [
+    invitations,
+    artists,
+    artworkByStatus,
+    evidence,
+    openGaps,
+    contradictions,
+    escalations,
+    casesByStatus,
+    issuedVersions,
+  ] = await Promise.all([
+    tx.memberInvitation.groupBy({ by: ['status'], _count: true }),
+    tx.artist.groupBy({ by: ['approved'], _count: true }),
+    tx.artwork.groupBy({ by: ['status'], _count: true }),
+    tx.evidence.count(),
+    tx.gap.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
+    tx.contradiction.count({ where: { resolvedAt: null } }),
+    tx.specialistEscalation.count({ where: { status: { not: 'ANSWERED' } } }),
+    tx.intelligenceCase.groupBy({ by: ['status'], _count: true }),
+    tx.caseVersion.count({ where: { issuedAt: { not: null } } }),
+  ]);
+
+  const tally = (rows: { _count: number }[], key: string, match: unknown) =>
+    rows.find((row) => (row as Record<string, unknown>)[key] === match)?._count ?? 0;
+
+  const sum = (rows: { _count: number }[]) => rows.reduce((total, row) => total + row._count, 0);
+
+  return {
+    invitations: {
+      total: sum(invitations),
+      sent: tally(invitations, 'status', 'SENT') + tally(invitations, 'status', 'OPENED'),
+      accepted: tally(invitations, 'status', 'ACCEPTED'),
+      completed: tally(invitations, 'status', 'COMPLETED'),
+      outstanding:
+        tally(invitations, 'status', 'CREATED') +
+        tally(invitations, 'status', 'SENT') +
+        tally(invitations, 'status', 'OPENED'),
+    },
+    artists: {
+      total: sum(artists),
+      approved: tally(artists, 'approved', true),
+      awaiting: tally(artists, 'approved', false),
+    },
+    artwork: Object.fromEntries(
+      artworkByStatus.map((row) => [row.status, row._count]),
+    ) as Record<string, number>,
+    evidence: {
+      records: evidence,
+      openGaps,
+      unresolvedContradictions: contradictions,
+      escalationsOutstanding: escalations,
+    },
+    cases: {
+      total: sum(casesByStatus),
+      byStatus: Object.fromEntries(
+        casesByStatus.map((row) => [row.status, row._count]),
+      ) as Record<string, number>,
+      issuedVersions,
+    },
+  };
+}
+
 export async function getCommandCentreData(actor: AuditActor) {
   return readAs(actor, async (tx) => ({
     vetting: await vettingQueue(tx),
+    dashboard: await dashboard(tx),
     invitations: await invitations(tx),
     recipientTypes: await tx.invitationRecipientType.findMany({
       where: { active: true },

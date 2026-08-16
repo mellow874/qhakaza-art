@@ -84,6 +84,7 @@ function Row({ children }: { children: React.ReactNode }) {
 }
 
 export function AdminCommandCenter({
+  dashboard,
   invitations,
   recipientTypes,
   emailConfigured,
@@ -400,6 +401,30 @@ export function AdminCommandCenter({
             are empty rather than showing figures that were never measured.
           </p>
         )}
+      </Panel>
+
+      <Panel id="figures" title="Where things stand" note="Counted from the records, live. Nothing here is a stored total.">
+        <div className="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            ['Invitations outstanding', dashboard.invitations.outstanding],
+            ['Onboarded', dashboard.invitations.completed],
+            ['Artists awaiting approval', dashboard.artists.awaiting],
+            ['Artwork submitted', dashboard.artwork.SUBMITTED ?? 0],
+            ['Artwork under review', dashboard.artwork.UNDER_REVIEW ?? 0],
+            ['Artwork published', dashboard.artwork.PUBLISHED ?? 0],
+            ['Evidence records', dashboard.evidence.records],
+            ['Open gaps', dashboard.evidence.openGaps],
+            ['Unresolved contradictions', dashboard.evidence.unresolvedContradictions],
+            ['Specialist reviews outstanding', dashboard.evidence.escalationsOutstanding],
+            ['Cases open', dashboard.cases.total],
+            ['Case versions issued', dashboard.cases.issuedVersions],
+          ].map(([label, value]) => (
+            <div key={String(label)} className="bg-canvas flex flex-col gap-1 p-4">
+              <span className="font-display text-heading text-2xl tabular-nums">{value}</span>
+              <span className="text-muted text-xs">{label}</span>
+            </div>
+          ))}
+        </div>
       </Panel>
 
       <Panel

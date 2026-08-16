@@ -14,22 +14,33 @@ export const privateNote = {
   aside: 'A few quiet minutes. Nothing here is a commitment.',
 
   /**
-   * ⚠ PLACEHOLDER — no audio file has been supplied.
+   * The background music.
    *
-   * `src` is null on purpose, and the player renders in a clearly-labelled
-   * unavailable state rather than pointing at a file that does not exist. Drop
-   * the track into `apps/collector/public/audio/` and set `src` to its path;
-   * nothing else needs to change.
+   * SWAPPABLE WITHOUT A CODE CHANGE. The URL comes from
+   * NEXT_PUBLIC_AUDIO_TRACK_URL when set, so dropping in the licensed track is
+   * an environment variable — or a storage URL — rather than an edit here.
    *
-   * Playback is opt-in, never autoplay: browsers block un-muted autoplay, so an
-   * autoplaying page would simply sit silent and look broken.
+   * ⚠ The default is a 3-second SILENT placeholder. It is a real audio file, so
+   * loading, looping, muting and failure all behave exactly as they will with
+   * the real track; it simply makes no sound. Silence rather than a stand-in
+   * tune, because shipping someone else's music into a demo is a licensing
+   * question nobody asked for.
+   *
+   * Playback is opt-in and starts MUTED. Browsers block un-muted autoplay, so
+   * an autoplaying page would sit silent and look broken.
    */
   audio: {
-    src: null as string | null,
+    src: (process.env.NEXT_PUBLIC_AUDIO_TRACK_URL ||
+      '/audio/placeholder-silence.wav') as string | null,
+    /** True while the placeholder is in use, so the page can say so. */
+    isPlaceholder: !process.env.NEXT_PUBLIC_AUDIO_TRACK_URL,
     title: 'A note to sit with',
     placeholder: 'Music will play here once the track is added.',
+    placeholderNote: 'The final track has not been supplied yet, so this plays silence.',
     play: 'Play music',
     pause: 'Pause music',
+    mute: 'Mute',
+    unmute: 'Unmute',
   },
 
   sections: {

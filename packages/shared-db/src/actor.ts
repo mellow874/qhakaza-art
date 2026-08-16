@@ -21,7 +21,13 @@ import { prisma } from './client';
  * it never silently keeps it.
  */
 
-export type ActorRole = 'admin' | 'advisor' | 'artist' | 'collector' | 'system';
+/**
+ * Kept in step with `RLS_ROLES` in rls.ts, which is the list the policies are
+ * generated from. A role here that the policies do not know is granted nothing,
+ * which fails safe but confusingly; a role the policies know and this does not
+ * cannot be declared at all.
+ */
+export type ActorRole = 'admin' | 'advisor' | 'analyst' | 'artist' | 'collector' | 'system';
 
 export type Actor = {
   role: ActorRole;
