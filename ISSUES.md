@@ -12,7 +12,7 @@ Status: **open** unless marked otherwise.
 ### B1 — Supabase: which project is production?
 
 **A Supabase project is already connected and working.** Schema, the
-`qhakaza_app` role and all 53 RLS policies are applied; the seed has run and the
+`qhakaza_app` role and all 56 RLS policies are applied; the seed has run and the
 three apps use it.
 
 The brief asks for a _new_ database created by the founder to migrate onto. That
@@ -60,6 +60,30 @@ Private Notes, Analytics, Access & permissions, Audit trail.
 
 That order is a **sensible default, pending founder input** — it puts the work
 queues first and the reference material last. Reordering is moving JSX blocks.
+
+### B9 - Four tables have no RLS at all
+
+Surfaced by the Phase 1 schema snapshot (`docs/SCHEMA-SNAPSHOT.md`), which
+reports RLS state per table rather than assuming it.
+
+Eight tables have row-level security disabled. Four are expected - NextAuth's
+`Account`, `Session`, `VerificationToken`, and `_prisma_migrations`. The other
+four are not:
+
+- **`User`** - the application role can read every row, including email
+  addresses and bcrypt password hashes. Auth needs to look users up by email,
+  so this needs a considered policy rather than a blanket one, but "no policy"
+  is not the right answer.
+- **`ContactMessage`** - written by the public contact form and the collector
+  private-request form. Readable by anyone the app role can serve.
+- **`Order`, `Favorite`** - legacy marketplace tables, retained but unprotected.
+
+Not fixed here: Phase 1 is migration readiness, and changing policies mid-audit
+would invalidate the snapshot it just produced. Belongs to section 22, where
+every table gets an `RLS_MATRIX` entry. Raised now because it is a live gap in
+production, not a future one.
+
+---
 
 ### B7 — No privacy policy or terms of service
 

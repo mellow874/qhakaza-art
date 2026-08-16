@@ -7,6 +7,7 @@
  */
 
 export { prisma } from './client';
+export * from './env';
 export * from './entities';
 export * from './actor';
 export * from './rls';

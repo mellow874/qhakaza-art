@@ -60,7 +60,7 @@ are content with that reading before I execute.
 
 | # | Item | Status | Evidence / gap |
 |---|---|:--:|---|
-| 1 | Production on Qhakaza-controlled Supabase | ❌ | Currently a Melsoft-owned project. Blocked on credentials; preparation is Phase 1. |
+| 1 | Production on Qhakaza-controlled Supabase | ⚠️ | **Preparation complete (Phase 1).** Scripts, runbook and verification all built and exercised against the live database. Currently still a Melsoft-owned project — execution blocked on credentials only. |
 | 2 | Admin sends artist **and** collector invitations | ⚠️ | [`inviteCollector`](apps/command-center/src/features/command-center/actions.ts) exists — collectors only, and only from an already-verified intake. No artist invitations, no recipient name, no sending. |
 | 3 | Invitation status tracked | ⚠️ | `InvitationStatus` has `ISSUED/ACCEPTED/EXPIRED/REVOKED`. Missing `Created`, `Sent`, `Opened`, `Completed`; no `sentAt`/`openedAt`/`sender` columns. |
 | 4 | Artists upload artwork images directly | ❌ | URL-only. [`artwork-form.tsx:183`](apps/vera/src/features/artwork/artwork-form.tsx) states this plainly to the artist. |
@@ -76,9 +76,10 @@ are content with that reading before I execute.
 | 14 | Briefings created & published from the platform | ⚠️ | A `NewsArticle` model exists with `status`/`publishedAt`. The site does **not** read it — [`content/briefings.ts`](apps/vera/src/content/briefings.ts) is a hardcoded array. No admin UI. |
 | 15 | Terms of Service versioned publication | ❌ | [`/terms`](apps/vera/src/app/(public)/terms/page.tsx) is an honest placeholder. No model. |
 | 16 | Background audio implemented | ⚠️ | [`ambient-audio.tsx`](apps/collector/src/features/private-note/ambient-audio.tsx) has opt-in playback, `loop`, and a labelled failure state. Missing: mute/unmute (it is play/pause), session persistence, and a config/storage-swappable source. |
-| 17 | Permissions prevent unauthorised exposure | ✅ | 53 RLS policies generated from [`rls.ts`](packages/shared-db/src/rls.ts), enforced by a `NOBYPASSRLS` role, covered by integration tests. **Must be extended to every new table in Phases 2–8** — this ✅ describes today's surface only. |
+| 17 | Permissions prevent unauthorised exposure | ✅ | 56 RLS policies generated from [`rls.ts`](packages/shared-db/src/rls.ts), enforced by a `NOBYPASSRLS` role, covered by integration tests. **Must be extended to every new table in Phases 2–8** — this ✅ describes today's surface only. |
 
-**Totals: 2 done, 6 partial, 9 not implemented.**
+**Totals at Phase 0: 2 done, 6 partial, 9 not implemented.**
+**After Phase 1: item 1 moved ❌ → ⚠️ (prepared, execution blocked).**
 
 ---
 
@@ -93,9 +94,9 @@ audit/dashboard/KPI, §18–20 content, §21–23 audio/security/storage), which
 | | |
 |---|---|
 | **Requirement** | New Qhakaza-owned project; schema, data and storage migration prepared; env-driven config; runbook. |
-| **Proposed implementation** | Export current schema via `prisma migrate diff` to a reviewed baseline. Idempotent SQL for role creation, grants and all 53 policies (already generated, not hand-written). A `scripts/migrate-data.ts` streaming table-by-table in FK order inside one transaction. Storage script deferred — nothing to migrate (see Critical Finding). Split env into `.env.development` / `.env.production` conventions with a single typed loader that fails loudly on a missing var. `MIGRATION_RUNBOOK.md` with pre-flight, execution, verification and rollback. |
+| **Proposed implementation** | Export current schema via `prisma migrate diff` to a reviewed baseline. Idempotent SQL for role creation, grants and all 56 policies (already generated, not hand-written). A `scripts/migrate-data.ts` streaming table-by-table in FK order inside one transaction. Storage script deferred — nothing to migrate (see Critical Finding). Split env into `.env.development` / `.env.production` conventions with a single typed loader that fails loudly on a missing var. `MIGRATION_RUNBOOK.md` with pre-flight, execution, verification and rollback. |
 | **Dependencies** | New project + both connection strings. |
-| **Status** | ❌ → buildable now except execution. |
+| **Status** | ✅ **Phase 1 complete** — everything but execution. See `MIGRATION_RUNBOOK.md`. |
 | **Blocker** | Credentials. Everything else proceeds. |
 
 **Correction to the brief:** there are no storage buckets, no Supabase Auth users
@@ -235,7 +236,7 @@ proposal: keep all three, name the new one `InternalNote`, and leave the existin
 two untouched. Confirm. *Blocks Phase 4.*
 
 **Q3 — Is `ADVISOR` the Internal Analyst?** If Internal Analyst is a *fifth*
-distinct role, say so before Phase 5 — retrofitting a role across 53+ policies is
+distinct role, say so before Phase 5 — retrofitting a role across 56+ policies is
 far cheaper decided up front.
 
 **Q4 — Section numbering.** My §2–23 mapping above is inferred. If the brief's
