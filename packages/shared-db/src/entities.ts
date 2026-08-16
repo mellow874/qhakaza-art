@@ -16,6 +16,7 @@ export const CORE_ENTITIES = [
   'CollectorVerification',
   'MemberInvitation',
   'InvitationRecipientType',
+  'MediaAsset',
   'Artist',
   'Artwork',
   'NewsArticle',
@@ -47,6 +48,9 @@ export const ENTITY_DOMAIN = {
   // Not collector-only: artist invitations use it too, and the list of
   // types is reference data rather than anyone's personal information.
   InvitationRecipientType: 'platform',
+  // Spans both sides: artwork photographs are supply-side, evidence
+  // documents are internal. The row's own confidentiality decides.
+  MediaAsset: 'platform',
   ActivationAttempt: 'collector',
   PrivateNoteSubmission: 'collector',
 

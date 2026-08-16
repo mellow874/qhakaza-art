@@ -158,6 +158,18 @@ export const RLS_MATRIX = {
     update: { admin: true },
     delete: {},
   },
+  MediaAsset: {
+    // Artists write their own uploads and read them back. Staff see everything.
+    // Collectors are NOT granted a read: released artwork images are served
+    // through the artwork record, and a collector who could read this table
+    // directly could enumerate evidence documents by changing an id.
+    select: { admin: true, advisor: true, artist: true },
+    insert: { admin: true, advisor: true, artist: true },
+    update: { admin: true, advisor: true, artist: true },
+    // Never. Section 23 requires files to stay retrievable; withdrawal is a
+    // status change, not a delete.
+    delete: {},
+  },
   ActivationAttempt: {
     // Append-only forensics. `system` inserts the record of a failed attempt,
     // which by definition happens with no valid actor. Nobody edits the log.

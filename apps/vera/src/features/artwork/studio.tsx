@@ -159,6 +159,12 @@ export function Studio({ artist, artworks }: Studio) {
                   </div>
 
                   <div className="flex flex-col items-end gap-2">
+                    <Link
+                      href={`/artist/work/${work.id}`}
+                      className="text-accent caps text-xs hover:underline"
+                    >
+                      Photographs
+                    </Link>
                     <span
                       className={cn(
                         'caps border px-3 py-1',

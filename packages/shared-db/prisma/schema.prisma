@@ -350,6 +350,84 @@ model Membership {
 /// `tokenHash` stores a SHA-256 of the token, never the token itself: a leaked
 /// database dump must not hand over working invitations. The plaintext exists
 /// only in the invitation email.
+/// How sensitive a stored file is.
+///
+/// Section 22 requires that unpublished evidence and internal analysis are
+/// never exposed through client-facing permissions. This is the per-file half
+/// of that: RLS decides who may read the ROW, and this decides how the file
+/// behind it may be served.
+enum FileConfidentiality {
+  /// Servable to anyone. Released artwork photographs.
+  PUBLIC
+  /// Staff only. Evidence documents, specialist reports, correspondence.
+  INTERNAL
+  /// Staff with a specific need. Named parties, legal material.
+  CONFIDENTIAL
+}
+
+enum MediaAssetStatus {
+  /// A signed upload URL was issued; the browser has not confirmed the upload.
+  PENDING
+  /// The object is in the bucket.
+  STORED
+  /// Withdrawn from view. The object is NOT deleted - see the model comment.
+  DELETED
+}
+
+/// Every file the platform stores, whatever it belongs to.
+///
+/// One table for artwork photographs, evidence documents, specialist reports
+/// and correspondence, because section 23 asks the same seven questions of all
+/// of them: who uploaded it, when, under what name, of what type and size,
+/// against which record, and how confidential.
+///
+/// POLYMORPHIC BY SUBJECT rather than one nullable foreign key per owner. The
+/// VERA phases add several more owners, and a table that grows a column per
+/// owner type ends up mostly nulls.
+///
+/// NOTHING IS EVER HARD-DELETED. Section 23 requires files to remain
+/// retrievable even when the visible record changes, so `status` moves to
+/// DELETED and the object stays in the bucket. A file that has been referenced
+/// in an assessment must still be produceable afterwards.
+model MediaAsset {
+  id String @id @default(cuid())
+
+  /// What this file belongs to: "Artwork", "Evidence", "SpecialistOpinion"...
+  /// Deliberately a string, not an enum: the VERA phases add subjects, and a
+  /// new one should not need a migration.
+  subjectType String
+  subjectId   String
+
+  /// Where the bytes are. Together these are the storage location.
+  bucket      String
+  storagePath String @unique
+
+  /// What the person called it. Kept separate from `storagePath`, which is
+  /// generated - two artists both uploading "final.jpg" must not collide.
+  originalFilename String
+  contentType      String
+  sizeBytes        Int
+
+  status          MediaAssetStatus    @default(PENDING)
+  confidentiality FileConfidentiality @default(INTERNAL)
+
+  /// Ordering within its subject, for a gallery of several images.
+  position Int @default(0)
+
+  uploadedById String?
+  uploadedAt   DateTime?
+  deletedAt    DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  @@index([subjectType, subjectId, status])
+  @@index([status, createdAt])
+  @@index([uploadedById])
+  @@index([createdById])
+}
+
 /// Who an invitation can be addressed to.
 ///
 /// A TABLE, not an enum, because the brief requires the type list to stay

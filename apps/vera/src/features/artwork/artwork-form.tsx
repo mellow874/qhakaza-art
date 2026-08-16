@@ -178,9 +178,11 @@ export function ArtworkForm({ onSubmit }: { onSubmit: (values: unknown) => Promi
       <Field
         label="Image links"
         error={errors.images}
-        // No uploader exists yet. Said plainly rather than presenting a field
-        // that looks like it should accept a file.
-        hint="One URL per line. File uploads are not available yet, so link to images hosted elsewhere."
+        // Supplementary now, not the primary route: photographs are uploaded on
+        // the work's own page once it has been saved. Kept because some artists
+        // already host their images elsewhere, and because it still works while
+        // storage is being connected.
+        hint="Optional. Save this work first and you can upload photographs to it directly; this field is for images already hosted elsewhere."
       >
         {({ className, ...fieldProps }) => (
           <textarea

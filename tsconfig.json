@@ -24,7 +24,8 @@
       "@qhakaza/shared-auth": ["./packages/shared-auth/src/index.ts"],
       "@qhakaza/shared-auth/*": ["./packages/shared-auth/src/*"],
       "@qhakaza/shared-ui": ["./packages/shared-ui/src/index.ts"],
-      "@qhakaza/shared-email": ["./packages/shared-email/src/index.ts"]
+      "@qhakaza/shared-email": ["./packages/shared-email/src/index.ts"],
+      "@qhakaza/shared-storage": ["./packages/shared-storage/src/index.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.mts"],

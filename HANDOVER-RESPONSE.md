@@ -63,7 +63,7 @@ are content with that reading before I execute.
 | 1 | Production on Qhakaza-controlled Supabase | ⚠️ | **Preparation complete (Phase 1).** Scripts, runbook and verification all built and exercised against the live database. Currently still a Melsoft-owned project — execution blocked on credentials only. |
 | 2 | Admin sends artist **and** collector invitations | ✅ | [`inviteCollector`](apps/command-center/src/features/command-center/actions.ts) exists — collectors only, and only from an already-verified intake. No artist invitations, no recipient name, no sending. |
 | 3 | Invitation status tracked | ✅ | `InvitationStatus` has `ISSUED/ACCEPTED/EXPIRED/REVOKED`. Missing `Created`, `Sent`, `Opened`, `Completed`; no `sentAt`/`openedAt`/`sender` columns. |
-| 4 | Artists upload artwork images directly | ❌ | URL-only. [`artwork-form.tsx:183`](apps/vera/src/features/artwork/artwork-form.tsx) states this plainly to the artist. |
+| 4 | Artists upload artwork images directly | ⚠️ | URL-only. [`artwork-form.tsx:183`](apps/vera/src/features/artwork/artwork-form.tsx) states this plainly to the artist. |
 | 5 | Private Notes live with permissions | ⚠️ | Two note tables exist (`PrivateNoteSubmission`, `PrivateNote`) but **neither is the internal administrative note this brief describes**. See §5 and Q2. |
 | 6 | Artwork submission & approval statuses | ⚠️ | `ArtStatus` is `DRAFT/LISTED/SOLD/HIDDEN`. Admin release/withdraw works ([`setArtworkRelease`](apps/command-center/src/features/command-center/actions.ts)); the 7-state review workflow does not exist. |
 | 7 | VERA evidence, claims, gaps, contradictions, escalation | ❌ | No such entities. 21 models in schema, none VERA. |
@@ -131,8 +131,8 @@ return-path CNAME. Without DKIM/SPF, invitations will be filed as spam.
 | **Requirement** | Native upload with preview, progress, replace, delete; type/size validation; Supabase Storage; metadata; URL demoted to optional; desktop + mobile. |
 | **Proposed implementation** | Add `@supabase/supabase-js` for Storage only (not auth, not data). Private bucket + short-lived signed upload URLs issued by a server action, so the browser never holds a service key. New `MediaAsset` model (§23) replacing reliance on `Artwork.images`; keep the column populated for backward compatibility rather than dropping it. Client uploader with `XMLHttpRequest` progress, object-URL previews, and pre-submission delete. Validate MIME **and** magic bytes server-side; a rejected type never reaches the bucket. |
 | **Dependencies** | Storage bucket in whichever project is live. Works against the current project today. |
-| **Status** | ❌ → buildable now. |
-| **Blocker** | None. |
+| **Status** | ⚠️ **Phase 3 built.** Model, storage layer, signed-upload actions, uploader UI and validation all done and tested. |
+| **Blocker** | `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, and a private bucket. Until then the uploader says so and the URL field still works. |
 
 ### §5 — Private Notes (internal administrative)
 
