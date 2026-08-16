@@ -20,7 +20,8 @@
       "@qhakaza/shared-db": ["../../packages/shared-db/src/index.ts"],
       "@qhakaza/shared-auth": ["../../packages/shared-auth/src/index.ts"],
       "@qhakaza/shared-auth/*": ["../../packages/shared-auth/src/*"],
-      "@qhakaza/shared-ui": ["../../packages/shared-ui/src/index.ts"]
+      "@qhakaza/shared-ui": ["../../packages/shared-ui/src/index.ts"],
+      "@qhakaza/shared-email": ["../../packages/shared-email/src/index.ts"]
     }
   },
   "include": [

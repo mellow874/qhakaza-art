@@ -15,6 +15,7 @@ export const CORE_ENTITIES = [
   'CollectorIntake',
   'CollectorVerification',
   'MemberInvitation',
+  'InvitationRecipientType',
   'Artist',
   'Artwork',
   'NewsArticle',
@@ -43,6 +44,9 @@ export const ENTITY_DOMAIN = {
   CollectorIntake: 'collector',
   CollectorVerification: 'collector',
   MemberInvitation: 'collector',
+  // Not collector-only: artist invitations use it too, and the list of
+  // types is reference data rather than anyone's personal information.
+  InvitationRecipientType: 'platform',
   ActivationAttempt: 'collector',
   PrivateNoteSubmission: 'collector',
 
@@ -76,6 +80,7 @@ export type {
   CollectorVerification,
   ContactMessage,
   DailyMetric,
+  InvitationRecipientType,
   MemberInvitation,
   Membership,
   NewsArticle,

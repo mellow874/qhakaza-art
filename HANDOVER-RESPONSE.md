@@ -61,8 +61,8 @@ are content with that reading before I execute.
 | # | Item | Status | Evidence / gap |
 |---|---|:--:|---|
 | 1 | Production on Qhakaza-controlled Supabase | ⚠️ | **Preparation complete (Phase 1).** Scripts, runbook and verification all built and exercised against the live database. Currently still a Melsoft-owned project — execution blocked on credentials only. |
-| 2 | Admin sends artist **and** collector invitations | ⚠️ | [`inviteCollector`](apps/command-center/src/features/command-center/actions.ts) exists — collectors only, and only from an already-verified intake. No artist invitations, no recipient name, no sending. |
-| 3 | Invitation status tracked | ⚠️ | `InvitationStatus` has `ISSUED/ACCEPTED/EXPIRED/REVOKED`. Missing `Created`, `Sent`, `Opened`, `Completed`; no `sentAt`/`openedAt`/`sender` columns. |
+| 2 | Admin sends artist **and** collector invitations | ✅ | [`inviteCollector`](apps/command-center/src/features/command-center/actions.ts) exists — collectors only, and only from an already-verified intake. No artist invitations, no recipient name, no sending. |
+| 3 | Invitation status tracked | ✅ | `InvitationStatus` has `ISSUED/ACCEPTED/EXPIRED/REVOKED`. Missing `Created`, `Sent`, `Opened`, `Completed`; no `sentAt`/`openedAt`/`sender` columns. |
 | 4 | Artists upload artwork images directly | ❌ | URL-only. [`artwork-form.tsx:183`](apps/vera/src/features/artwork/artwork-form.tsx) states this plainly to the artist. |
 | 5 | Private Notes live with permissions | ⚠️ | Two note tables exist (`PrivateNoteSubmission`, `PrivateNote`) but **neither is the internal administrative note this brief describes**. See §5 and Q2. |
 | 6 | Artwork submission & approval statuses | ⚠️ | `ArtStatus` is `DRAFT/LISTED/SOLD/HIDDEN`. Admin release/withdraw works ([`setArtworkRelease`](apps/command-center/src/features/command-center/actions.ts)); the 7-state review workflow does not exist. |
@@ -80,6 +80,7 @@ are content with that reading before I execute.
 
 **Totals at Phase 0: 2 done, 6 partial, 9 not implemented.**
 **After Phase 1: item 1 moved ❌ → ⚠️ (prepared, execution blocked).**
+**After Phase 2: items 2 and 3 moved ⚠️ → ✅. Delivery of email itself is still blocked on a provider.**
 
 ---
 
@@ -110,7 +111,7 @@ smaller than described.
 | **Requirement** | Admin-driven invitations for Artist and Collector, extensible types, full status model, no duplicate users, sent from `desk@qhakazaartcollective.co.za`. |
 | **Proposed implementation** | Generalise `MemberInvitation` → add `recipientName`, `recipientType` (FK to a lookup table, not an enum, per "extensible"), `sentAt`, `openedAt`, `completedAt`, `sentById`. Extend status to `CREATED/SENT/OPENED/ACCEPTED/COMPLETED/EXPIRED/CANCELLED`. Open-tracking via a redirect endpoint on the invitation link, which is honest and needs no tracking pixel. Duplicate prevention already half-solved: `tokenHash` is unique and single-use; add a partial unique index on `(email, recipientType)` for live invitations and make acceptance idempotent. Email behind an `EmailService` interface with a `LoggingEmailService` default, so nothing blocks. |
 | **Dependencies** | Email provider (open item 2). |
-| **Status** | ⚠️ → buildable now; sending stubbed. |
+| **Status** | ✅ **Phase 2 complete.** Workflow, statuses, single-use guarantee and admin UI all built and tested. Sending runs through the logging service until a provider is connected. |
 | **Blocker** | None for the workflow. Sending blocked on provider + DNS. |
 
 **What is needed to connect email** — recommend **Resend**: an API key, and on

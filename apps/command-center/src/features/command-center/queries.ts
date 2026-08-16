@@ -219,9 +219,42 @@ function auditTrail(tx: Tx) {
 }
 
 /** Everything the console shows, read as the acting member of staff, once. */
+/**
+ * Invitations, newest first.
+ *
+ * Includes cancelled and expired ones: the brief asks for status to be
+ * tracked, and a list that quietly drops everything that did not work out
+ * tracks only the happy path.
+ */
+async function invitations(tx: Tx) {
+  return tx.memberInvitation.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+    select: {
+      id: true,
+      email: true,
+      recipientName: true,
+      status: true,
+      createdAt: true,
+      sentAt: true,
+      openedAt: true,
+      acceptedAt: true,
+      completedAt: true,
+      expiresAt: true,
+      recipientType: { select: { slug: true, label: true } },
+    },
+  });
+}
+
 export async function getCommandCentreData(actor: AuditActor) {
   return readAs(actor, async (tx) => ({
     vetting: await vettingQueue(tx),
+    invitations: await invitations(tx),
+    recipientTypes: await tx.invitationRecipientType.findMany({
+      where: { active: true },
+      orderBy: { ordering: 'asc' },
+      select: { id: true, slug: true, label: true },
+    }),
     intakes: await intakeQueue(tx),
     comms: await communications(tx),
     privateNotes: await privateNotes(tx),

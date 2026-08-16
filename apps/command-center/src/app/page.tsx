@@ -7,6 +7,7 @@ import { auth } from '@qhakaza/shared-auth/server';
 
 import { AdminCommandCenter } from '@/components/AdminCommandCenter';
 import { getCommandCentreData } from '@/features/command-center/queries';
+import { getEmailStatus } from '@/features/invitations/actions';
 
 export const metadata: Metadata = {
   title: 'Command Center',
@@ -39,10 +40,16 @@ export default async function CommandCenterPage() {
   // One call, one transaction, one declared actor. See queries.ts for why this
   // is deliberately not seven parallel reads.
   const data = await getCommandCentreData(actor);
+  const email = await getEmailStatus();
 
   return (
     <div className="theme-light bg-canvas text-body min-h-svh">
-      <AdminCommandCenter actorRole={actor.role} actorId={actor.userId} {...data} />
+      <AdminCommandCenter
+        actorRole={actor.role}
+        actorId={actor.userId}
+        emailConfigured={email.configured}
+        {...data}
+      />
     </div>
   );
 }

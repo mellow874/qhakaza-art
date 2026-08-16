@@ -1,5 +1,5 @@
-import { writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 
 import { CORE_ENTITIES } from '../src/entities';
 import { policyExpression, type Operation } from '../src/rls';
@@ -98,9 +98,38 @@ for (const entity of CORE_ENTITIES) {
 // The generated SQL is idempotent (DROP POLICY IF EXISTS before each CREATE),
 // so regenerating into a new migration folder re-applies the whole matrix
 // cleanly rather than requiring the previous migration to be edited in place.
-const name = process.argv[2] ?? '20260805000000_row_level_security';
+const name = process.argv[2];
+
+/*
+ * A NAME IS REQUIRED, and an existing file is never overwritten.
+ *
+ * This used to default to the original RLS migration folder. Running it with no
+ * arguments therefore rewrote a migration that had already been applied to
+ * production, which breaks Prisma's stored checksum and blocks every later
+ * deploy. It happened twice while building Phase 2 before the default was
+ * removed.
+ */
+if (!name) {
+  console.error(
+    'Usage: tsx scripts/generate-rls.ts <migration_folder_name> [--force]\n\n' +
+      '  The generated SQL is idempotent, so always point it at a NEW folder:\n' +
+      '    tsx scripts/generate-rls.ts 20260813000200_invitation_recipient_type_rls\n',
+  );
+  process.exit(1);
+}
+
 const target = resolve(import.meta.dirname, `../prisma/migrations/${name}/migration.sql`);
 
+if (existsSync(target) && !process.argv.includes('--force')) {
+  console.error(
+    `Refusing to overwrite ${target}\n` +
+      '  If that migration has been applied anywhere, editing it breaks the\n' +
+      '  checksum. Generate into a new folder, or pass --force if you are sure.\n',
+  );
+  process.exit(1);
+}
+
+mkdirSync(dirname(target), { recursive: true });
 writeFileSync(target, lines.join('\n'), 'utf8');
 console.log(`wrote ${target}`);
 console.log(

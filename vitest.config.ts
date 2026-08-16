@@ -19,6 +19,7 @@ const sharedPackageAliases = {
   '@qhakaza/shared-db': resolvePackage('shared-db'),
   '@qhakaza/shared-auth': resolvePackage('shared-auth'),
   '@qhakaza/shared-ui': resolvePackage('shared-ui'),
+  '@qhakaza/shared-email': resolvePackage('shared-email'),
 };
 
 /**

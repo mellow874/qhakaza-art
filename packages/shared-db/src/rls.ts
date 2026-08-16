@@ -149,6 +149,15 @@ export const RLS_MATRIX = {
     update: { admin: true, advisor: true },
     delete: {},
   },
+  InvitationRecipientType: {
+    // Reference data, not personal data. Every actor may read it -- `system`
+    // needs it while accepting an invitation, before a session exists, to learn
+    // which role the invitation grants. Only an admin may change the list.
+    select: { admin: true, advisor: true, artist: true, collector: true, system: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
   ActivationAttempt: {
     // Append-only forensics. `system` inserts the record of a failed attempt,
     // which by definition happens with no valid actor. Nobody edits the log.

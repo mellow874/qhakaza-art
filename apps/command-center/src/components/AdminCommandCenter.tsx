@@ -11,6 +11,7 @@ import { cn } from '@qhakaza/shared-ui';
 
 import { ActionButton } from '@/features/command-center/action-button';
 import type { CommandCentreData } from '@/features/command-center/queries';
+import { InvitationPanel } from '@/features/invitations/invitation-panel';
 
 /**
  * AdminCommandCenter — the admin hub.
@@ -37,6 +38,8 @@ import type { CommandCentreData } from '@/features/command-center/queries';
 type Props = CommandCentreData & {
   actorRole: 'ADMIN' | 'ADVISOR';
   actorId: string;
+  /** Whether a real provider is wired up, so the panel can say so plainly. */
+  emailConfigured: boolean;
 };
 
 function Panel({
@@ -81,6 +84,9 @@ function Row({ children }: { children: React.ReactNode }) {
 }
 
 export function AdminCommandCenter({
+  invitations,
+  recipientTypes,
+  emailConfigured,
   actorRole,
   actorId,
   vetting,
@@ -394,6 +400,18 @@ export function AdminCommandCenter({
             are empty rather than showing figures that were never measured.
           </p>
         )}
+      </Panel>
+
+      <Panel
+        id="invitations"
+        title="Invitations"
+        note="A link is shown once. Only its fingerprint is stored, so it cannot be shown again."
+      >
+        <InvitationPanel
+          invitations={invitations}
+          recipientTypes={recipientTypes}
+          emailConfigured={emailConfigured}
+        />
       </Panel>
 
       <Panel

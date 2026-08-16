@@ -100,10 +100,37 @@ enum MembershipStatus {
   REVOKED
 }
 
+/// The invitation lifecycle, as specified by the handover brief:
+///
+///   CREATED -> SENT -> OPENED -> ACCEPTED -> COMPLETED
+///
+/// plus EXPIRED and CANCELLED, which can interrupt it at any point.
+///
+/// ISSUED and REVOKED are the ORIGINAL spellings, kept because PostgreSQL
+/// cannot drop an enum value without recreating the type, and because this
+/// project does not rewrite history it does not have to. Existing rows were
+/// migrated ISSUED -> CREATED and REVOKED -> CANCELLED; nothing writes the old
+/// two any more. Treat them as read-only synonyms if you meet them in old data.
 enum InvitationStatus {
-  ISSUED
+  /// The record exists and a link has been generated. Not yet emailed.
+  CREATED
+  /// Handed to the email layer successfully.
+  SENT
+  /// The recipient followed the link at least once.
+  OPENED
+  /// The recipient signed in and the invitation was consumed. Single-use.
   ACCEPTED
+  /// Onboarding finished - the artist has a profile, or the collector a
+  /// membership. The end of the happy path.
+  COMPLETED
+  /// Past `expiresAt` without being accepted.
   EXPIRED
+  /// Withdrawn by staff before acceptance.
+  CANCELLED
+
+  /// @deprecated original spelling of CREATED
+  ISSUED
+  /// @deprecated original spelling of CANCELLED
   REVOKED
 }
 
@@ -323,25 +350,70 @@ model Membership {
 /// `tokenHash` stores a SHA-256 of the token, never the token itself: a leaked
 /// database dump must not hand over working invitations. The plaintext exists
 /// only in the invitation email.
-model MemberInvitation {
-  id           String           @id @default(cuid())
-  membershipId String?
-  email        String
-  tokenHash    String           @unique
-  status       InvitationStatus @default(ISSUED)
-  expiresAt    DateTime
-  acceptedAt   DateTime?
-  revokedAt    DateTime?
+/// Who an invitation can be addressed to.
+///
+/// A TABLE, not an enum, because the brief requires the type list to stay
+/// extensible. Adding "Institution" or "Advisor" later must be a row, not a
+/// migration and a redeploy.
+model InvitationRecipientType {
+  id       String  @id @default(cuid())
+  /// Stable machine name. Referenced in code; never shown to a user.
+  slug     String  @unique
+  label    String
+  /// The role the accepted account is given. Kept here so the mapping from
+  /// invitation to role is data rather than a switch statement.
+  grantsRole Role
+  /// Retired types stop being offered without breaking the rows that used them.
+  active   Boolean @default(true)
+  ordering Int     @default(0)
 
   createdAt   DateTime @default(now()) @map("created_date")
   updatedAt   DateTime @updatedAt @map("updated_date")
   createdById String?  @map("created_by_id")
 
-  membership Membership?         @relation(fields: [membershipId], references: [id], onDelete: SetNull)
-  attempts   ActivationAttempt[]
+  invitations MemberInvitation[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+model MemberInvitation {
+  id           String           @id @default(cuid())
+  /// Null for artist invitations: an artist has no membership to attach to.
+  membershipId String?
+  /// Null only for rows predating the recipient-type table.
+  recipientTypeId String?
+  recipientName   String?
+  email        String
+  tokenHash    String           @unique
+  status       InvitationStatus @default(CREATED)
+  expiresAt    DateTime
+
+  /// The lifecycle timestamps. Each is set once, by the transition that earns
+  /// it, and never cleared - the row is its own history.
+  sentAt      DateTime?
+  openedAt    DateTime?
+  acceptedAt  DateTime?
+  completedAt DateTime?
+  revokedAt   DateTime?
+
+  /// Who pressed send, which is not always who created the record.
+  sentById String?
+  /// The account this invitation produced. The single-use guarantee: an
+  /// invitation with this set has already made its user and cannot make another.
+  acceptedByUserId String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  membership    Membership?              @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  recipientType InvitationRecipientType? @relation(fields: [recipientTypeId], references: [id], onDelete: SetNull)
+  attempts      ActivationAttempt[]
 
   @@index([status, expiresAt])
   @@index([email])
+  @@index([recipientTypeId, status])
   @@index([createdById])
 }
 

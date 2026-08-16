@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-import { asSystem } from '@qhakaza/shared-db';
+import { asSystem, fingerprintToken } from '@qhakaza/shared-db';
 
 import { isRole, type Role } from './rbac';
 
@@ -43,9 +43,7 @@ export function requireRole(session: Session, allowed: readonly Role[]): RoleGra
 }
 
 /** SHA-256 of a token. Invitations are stored hashed, never in plaintext. */
-export function fingerprintToken(token: string): string {
-  return createHash('sha256').update(token, 'utf8').digest('hex');
-}
+export { fingerprintToken } from '@qhakaza/shared-db';
 
 /**
  * Constant-time comparison of two hex digests.
