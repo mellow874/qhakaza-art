@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 
-import { briefings, hero } from '@/content/briefings';
+import { hero } from '@/content/briefings';
+import { DemoNotice } from '@/features/content/demo-notice';
+import { getBriefings } from '@/features/content/queries';
 import { BriefingCard } from '@/features/briefings/briefing-card';
 
 export const metadata: Metadata = {
@@ -14,7 +16,12 @@ export const metadata: Metadata = {
   },
 };
 
-export default function BriefingsPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function BriefingsPage() {
+  const briefings = await getBriefings();
+  const anyDemo = briefings.some((briefing) => briefing.isDemo);
+
   return (
     <main className="flex flex-col">
       <section className="border-line/60 border-b">
@@ -25,6 +32,8 @@ export default function BriefingsPage() {
       </section>
 
       <div className="mx-auto w-full max-w-7xl px-6 py-24 sm:py-28">
+        {anyDemo && <DemoNotice what="The article text" />}
+
         {briefings.length === 0 ? (
           <p className="text-muted border-line rounded-(--radius-soft) border border-dashed p-16 text-center text-sm">
             No briefings have been published yet.

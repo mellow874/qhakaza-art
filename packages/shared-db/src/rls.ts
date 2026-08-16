@@ -89,6 +89,9 @@ export const RELEASED: Partial<Record<CoreEntity, string>> = {
   // is the release, and an approved-but-unreleased work must stay invisible.
   Artwork: `"status" = 'PUBLISHED' AND "artistId" IN (SELECT "id" FROM "Artist" WHERE "approved" = true)`,
   NewsArticle: `"status" = 'PUBLISHED'`,
+  FaqItem: `"published" = true`,
+  Briefing: `"status" = 'PUBLISHED'`,
+  LegalDocumentVersion: `"status" = 'PUBLISHED'`,
 };
 
 /**
@@ -389,6 +392,63 @@ export const RLS_MATRIX = {
     update: {},
     delete: {},
   },
+  // --- Content surfaces --------------------------------------------------
+  // Read by everyone, written only by staff. The `released` grant means a
+  // visitor sees PUBLISHED rows and nothing else, so an unfinished Briefing or
+  // an unpublished Terms revision cannot leak by guessing a URL.
+  FaqCategory: {
+    select: { admin: true, advisor: true, analyst: true, artist: true, collector: true, public: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  FaqItem: {
+    select: {
+      admin: true,
+      advisor: true,
+      analyst: true,
+      artist: 'released',
+      collector: 'released',
+      public: 'released',
+    },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  Briefing: {
+    select: {
+      admin: true,
+      advisor: true,
+      analyst: true,
+      artist: 'released',
+      collector: 'released',
+      public: 'released',
+    },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  BriefingRelation: {
+    select: { admin: true, advisor: true, analyst: true, artist: true, collector: true, public: true },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  LegalDocumentVersion: {
+    // No delete for anyone. You must be able to show what someone agreed to on
+    // the day they agreed to it.
+    select: {
+      admin: true,
+      advisor: true,
+      analyst: true,
+      artist: 'released',
+      collector: 'released',
+      public: 'released',
+    },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
   MediaAsset: {
     // Artists write their own uploads and read them back. Staff see everything.
     // Collectors are NOT granted a read: released artwork images are served
@@ -451,8 +511,13 @@ export const RLS_MATRIX = {
   AuditLog: {
     // Append-only by policy: NO role gets UPDATE or DELETE, including admin.
     // An audit trail an administrator can rewrite is not an audit trail.
+    //
+    // `analyst` must be able to INSERT. Every audited action writes its log row
+    // in the same transaction as the change, so a role that cannot write here
+    // cannot act at all -- adding ANALYST without this line would have made
+    // every analyst action fail at the audit step.
     select: { admin: true },
-    insert: { admin: true, advisor: true },
+    insert: { admin: true, advisor: true, analyst: true },
     update: {},
     delete: {},
   },

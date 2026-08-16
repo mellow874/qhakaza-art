@@ -73,8 +73,8 @@ are content with that reading before I execute.
 | 11 | Material activity auditable | ✅ | `AuditLog` model with `before`/`after` JSON, plus a `performAudited()` wrapper used by every Command Center mutation. Append-only in practice; see §15 for the one hardening change needed. |
 | 12 | Core VERA KPIs captured | ❌ | Depends on 7–10. `AnalyticsEvent`/`DailyMetric` exist but have no writer. |
 | 13 | FAQ manageable without code changes | ❌ | [`content/faq.ts`](apps/vera/src/content/faq.ts) is a TypeScript file; editing needs a deploy. |
-| 14 | Briefings created & published from the platform | ⚠️ | A `NewsArticle` model exists with `status`/`publishedAt`. The site does **not** read it — [`content/briefings.ts`](apps/vera/src/content/briefings.ts) is a hardcoded array. No admin UI. |
-| 15 | Terms of Service versioned publication | ❌ | [`/terms`](apps/vera/src/app/(public)/terms/page.tsx) is an honest placeholder. No model. |
+| 14 | Briefings created & published from the platform | ✅ | A `NewsArticle` model exists with `status`/`publishedAt`. The site does **not** read it — [`content/briefings.ts`](apps/vera/src/content/briefings.ts) is a hardcoded array. No admin UI. |
+| 15 | Terms of Service versioned publication | ✅ | [`/terms`](apps/vera/src/app/(public)/terms/page.tsx) is an honest placeholder. No model. |
 | 16 | Background audio implemented | ⚠️ | [`ambient-audio.tsx`](apps/collector/src/features/private-note/ambient-audio.tsx) has opt-in playback, `loop`, and a labelled failure state. Missing: mute/unmute (it is play/pause), session persistence, and a config/storage-swappable source. |
 | 17 | Permissions prevent unauthorised exposure | ✅ | 56 RLS policies generated from [`rls.ts`](packages/shared-db/src/rls.ts), enforced by a `NOBYPASSRLS` role, covered by integration tests. **Must be extended to every new table in Phases 2–8** — this ✅ describes today's surface only. |
 
@@ -83,7 +83,8 @@ are content with that reading before I execute.
 **After Phase 2: items 2 and 3 moved ⚠️ → ✅. Delivery of email itself is still blocked on a provider.**
 **After Phases 3 and 4: items 4, 5 and 6 moved → ✅. Storage is connected and verified.**
 **After Phase 5: items 7, 8, 9 and 10 moved → ✅.**
-**Running total: 12 of 17 done.** Remaining: 12 (KPIs), 13 (FAQ), 14 (Briefings), 15 (Terms), 16 (audio).
+**After Phase 7: items 13, 14 and 15 moved → ✅.**
+**Running total: 15 of 17 done.** Remaining: 12 (KPIs) and 16 (audio) — both Phase 6/8 work in progress.
 
 ---
 

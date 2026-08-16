@@ -1731,3 +1731,148 @@ model ArtworkPublication {
   @@index([publicationId])
   @@index([createdById])
 }
+
+// ===========================================================================
+// Content surfaces
+//
+// Everything here exists so the words on the public sites can change without a
+// deployment. Each was previously a TypeScript file that only a developer
+// could edit, which is the thing section 18-20 asks us to stop.
+//
+// DEMO CONTENT IS MARKED IN THE DATA, not just in a comment. Every row carries
+// `isDemo`, the surfaces render a visible notice while any is present, and one
+// UPDATE clears the lot. Placeholder text that cannot be told apart from real
+// content is how a demo becomes a liability.
+// ===========================================================================
+
+model FaqCategory {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  label    String
+  ordering Int     @default(0)
+  active   Boolean @default(true)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  items FaqItem[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+model FaqItem {
+  id         String @id @default(cuid())
+  categoryId String
+
+  question String
+  answer   String
+
+  ordering  Int     @default(0)
+  published Boolean @default(false)
+  /// Written by the developers to fill the page for a demo. Not Qhakaza's
+  /// words, and the site says so while any remain.
+  isDemo    Boolean @default(false)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  category FaqCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId, ordering])
+  @@index([published])
+  @@index([createdById])
+}
+
+/// A Briefing, managed from the Command Center.
+///
+/// Distinct from the existing `NewsArticle`, which is retained: that model was
+/// built to an earlier brief and holds no rows the site reads. This one carries
+/// the fields section 19 names - subtitle, author, cover image, sources and
+/// related Briefings - and is what the site now reads.
+model Briefing {
+  id   String @id @default(cuid())
+  slug String @unique
+
+  title    String
+  subtitle String?
+  author   String?
+  category String?
+
+  /// The full text. Markdown-ish plain text; rendered as paragraphs.
+  body    String?
+  /// The summary shown in listings. Supplied for every Briefing from the start.
+  excerpt String
+
+  coverImageUrl String?
+  /// Where the claims come from. A Briefing making market claims without
+  /// sources is the thing VERA exists to argue against.
+  sources       String?
+
+  publishedAt DateTime?
+  status      ArticleStatus @default(DRAFT)
+  isDemo      Boolean       @default(false)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  relatedTo   BriefingRelation[] @relation("BriefingFrom")
+  relatedFrom BriefingRelation[] @relation("BriefingTo")
+
+  @@index([status, publishedAt])
+  @@index([createdById])
+}
+
+/// "Related Briefings", per section 19. A junction because the relationship is
+/// many-to-many and deliberately not symmetric: A may point at B without B
+/// pointing back.
+model BriefingRelation {
+  id     String @id @default(cuid())
+  fromId String
+  toId   String
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  from Briefing @relation("BriefingFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to   Briefing @relation("BriefingTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId])
+  @@index([toId])
+  @@index([createdById])
+}
+
+/// A published version of a legal document.
+///
+/// PUBLISHING A NEW VERSION NEVER DELETES A PRIOR ONE. Section 20 requires
+/// previous-version retention, and for a document people agreed to that is not
+/// a nicety: you must be able to show what someone accepted on the day they
+/// accepted it. There is no delete path anywhere for this table.
+model LegalDocumentVersion {
+  id String @id @default(cuid())
+
+  /// "TERMS" or "PRIVACY". A string rather than an enum so a third document
+  /// does not need a migration.
+  documentKey String
+
+  versionNumber String
+  effectiveFrom DateTime
+
+  title String
+  body  String
+
+  status ArticleStatus @default(DRAFT)
+  isDemo Boolean       @default(false)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  @@unique([documentKey, versionNumber])
+  @@index([documentKey, status, effectiveFrom])
+  @@index([createdById])
+}

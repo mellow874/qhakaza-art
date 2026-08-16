@@ -23,6 +23,9 @@ const ACCOUNT_LINKS: Record<Role, { href: string; label: string }> = {
   COLLECTOR: { href: '/collector/favourites', label: 'Favourites' },
   ADMIN: { href: '/admin', label: 'Admin' },
   ADVISOR: { href: '/admin', label: 'Admin' },
+  // Analysts work Cases, which live in the Command Center alongside the rest
+  // of the back office. Caught by this Record exactly as ADVISOR was.
+  ANALYST: { href: '/admin', label: 'Admin' },
 };
 
 export type HeaderSession = { user: { name?: string | null; role: Role } } | null;

@@ -50,6 +50,13 @@ export const CORE_ENTITIES = [
   'EvidenceSource',
   'ArtworkExhibition',
   'ArtworkPublication',
+
+  // Content surfaces
+  'FaqCategory',
+  'FaqItem',
+  'Briefing',
+  'BriefingRelation',
+  'LegalDocumentVersion',
   'Artist',
   'Artwork',
   'NewsArticle',
@@ -120,6 +127,13 @@ export const ENTITY_DOMAIN = {
   EvidenceSource: 'platform',
   ArtworkExhibition: 'platform',
   ArtworkPublication: 'platform',
+
+  // Content surfaces. Published rows are read by the public sites.
+  FaqCategory: 'platform',
+  FaqItem: 'platform',
+  Briefing: 'platform',
+  BriefingRelation: 'platform',
+  LegalDocumentVersion: 'platform',
   ActivationAttempt: 'collector',
   PrivateNoteSubmission: 'collector',
 
