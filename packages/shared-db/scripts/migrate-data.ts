@@ -89,6 +89,45 @@ async function readDependencies(client: PrismaClient) {
   return buildDependencyGraph(rows);
 }
 
+/**
+ * The SQL cast each column needs, by column name.
+ *
+ * Values read back through `$queryRaw` arrive as plain JavaScript, so an enum
+ * comes back as a string and Postgres refuses it: "column is of type Role but
+ * expression is of type text". It will not cast text to an enum implicitly.
+ * The same applies to arrays and jsonb. So every parameter is cast to the
+ * column's own type on the way in.
+ */
+async function readColumnCasts(
+  client: PrismaClient,
+  table: string,
+): Promise<Map<string, string>> {
+  const rows = await client.$queryRawUnsafe<
+    { column_name: string; data_type: string; udt_name: string }[]
+  >(
+    `SELECT column_name, data_type, udt_name
+       FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = $1`,
+    table,
+  );
+
+  const casts = new Map<string, string>();
+
+  for (const { column_name, data_type, udt_name } of rows) {
+    if (data_type === 'USER-DEFINED') {
+      // An enum. Quoted: these names are PascalCase and case-sensitive.
+      casts.set(column_name, `"${udt_name}"`);
+    } else if (data_type === 'ARRAY') {
+      // udt_name for text[] is "_text"; the element type is what we cast to.
+      casts.set(column_name, `${udt_name.replace(/^_/, '')}[]`);
+    } else if (data_type === 'jsonb' || data_type === 'json') {
+      casts.set(column_name, data_type);
+    }
+  }
+
+  return casts;
+}
+
 async function countRows(client: PrismaClient, table: string): Promise<number> {
   const [{ n }] = await client.$queryRawUnsafe<{ n: bigint }[]>(
     `SELECT count(*)::bigint AS n FROM "${table}"`,
@@ -136,18 +175,19 @@ async function main() {
     process.exit(1);
   }
 
-  if (occupied.length > 0 && TRUNCATE && !DRY_RUN) {
-    console.log(`  Truncating ${occupied.length} table(s) in the target…`);
-    // One statement, reverse dependency order handled by CASCADE.
-    await target.$executeRawUnsafe(
-      `TRUNCATE TABLE ${order.map((t) => `"${t}"`).join(', ')} CASCADE`,
-    );
-  }
-
   let copied = 0;
   const report: { table: string; rows: number }[] = [];
 
   const run = async (tx: Pick<PrismaClient, '$executeRawUnsafe'>) => {
+    // Inside the transaction on purpose. Emptying the target and then failing
+    // the copy would leave it worse than when we started.
+    if (occupied.length > 0 && TRUNCATE && !DRY_RUN) {
+      console.log(`  Truncating ${occupied.length} table(s) in the target…`);
+      await tx.$executeRawUnsafe(
+        `TRUNCATE TABLE ${order.map((t) => `"${t}"`).join(', ')} CASCADE`,
+      );
+    }
+
     for (const table of order) {
       const total = await countRows(source, table);
       report.push({ table, rows: total });
@@ -171,13 +211,16 @@ async function main() {
 
         const columns = Object.keys(rows[0]);
         const columnList = columns.map((c) => `"${c}"`).join(', ');
+        const casts = await readColumnCasts(target, table);
 
-        // Parameterised: values are data, never concatenated into SQL.
+        // Parameterised: values are data, never concatenated into SQL. The
+        // cast is derived from the target's own catalogue, not from the value.
         const values: unknown[] = [];
         const tuples = rows.map((row) => {
           const placeholders = columns.map((column) => {
             values.push(row[column]);
-            return `$${values.length}`;
+            const cast = casts.get(column);
+            return cast ? `$${values.length}::${cast}` : `$${values.length}`;
           });
           return `(${placeholders.join(', ')})`;
         });

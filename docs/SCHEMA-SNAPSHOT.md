@@ -13,14 +13,17 @@ after migrating and diff the two files — that diff is the migration's proof.
 
 | migration | applied | state |
 | --- | --- | --- |
-| 20260803194152_init | 2026-08-05 13:31 | ok |
-| 20260804134059_contact_message | 2026-08-05 13:31 | ok |
-| 20260804193412_collector_application | 2026-08-05 13:31 | ok |
-| 20260804230000_core_entities_and_field_convention | 2026-08-05 13:31 | ok |
-| 20260804231500_align_index_names | 2026-08-05 13:31 | ok |
-| 20260805000000_row_level_security | 2026-08-05 13:31 | ok |
-| 20260805001000_rls_anonymous_context | 2026-08-05 13:31 | ok |
-| 20260806000000_intake_kinds_and_private_note | 2026-08-12 17:39 | ok |
+| 20260803194152_init | 2026-08-16 18:31 | ok |
+| 20260804134059_contact_message | 2026-08-16 18:31 | ok |
+| 20260804193412_collector_application | 2026-08-16 18:31 | ok |
+| 20260804230000_core_entities_and_field_convention | 2026-08-16 18:31 | ok |
+| 20260804231500_align_index_names | 2026-08-16 18:31 | ok |
+| 20260805000000_row_level_security | 2026-08-16 18:31 | ok |
+| 20260805001000_rls_anonymous_context | 2026-08-16 18:31 | ok |
+| 20260806000000_intake_kinds_and_private_note | 2026-08-16 18:31 | ok |
+| 20260813000000_invitation_status_values | 2026-08-16 18:31 | ok |
+| 20260813000100_invitation_lifecycle | 2026-08-16 18:31 | ok |
+| 20260813000200_invitation_recipient_type_rls | 2026-08-16 18:31 | ok |
 
 
 ## Tables, RLS and row counts
@@ -38,6 +41,7 @@ after migrating and diff the two files — that diff is the migration's proof.
 | ContactMessage | false | false | 0 | 3 |
 | DailyMetric | true | false | 4 | 0 |
 | Favorite | false | false | 0 | 3 |
+| InvitationRecipientType | true | false | 4 | 2 |
 | MemberInvitation | true | false | 4 | 8 |
 | Membership | true | false | 4 | 8 |
 | NewsArticle | true | false | 4 | 0 |
@@ -48,7 +52,7 @@ after migrating and diff the two files — that diff is the migration's proof.
 | Session | false | false | 0 | 0 |
 | User | false | false | 0 | 12 |
 | VerificationToken | false | false | 0 | 0 |
-| _prisma_migrations | false | false | 0 | 8 |
+| _prisma_migrations | false | false | 0 | 11 |
 
 
 > **8 table(s) without RLS enabled:** Account, ContactMessage, Favorite, Order, Session, User, VerificationToken, _prisma_migrations.
@@ -91,6 +95,10 @@ after migrating and diff the two files — that diff is the migration's proof.
 | DailyMetric | dailymetric_insert | INSERT | {public} |
 | DailyMetric | dailymetric_select | SELECT | {public} |
 | DailyMetric | dailymetric_update | UPDATE | {public} |
+| InvitationRecipientType | invitationrecipienttype_delete | DELETE | {public} |
+| InvitationRecipientType | invitationrecipienttype_insert | INSERT | {public} |
+| InvitationRecipientType | invitationrecipienttype_select | SELECT | {public} |
+| InvitationRecipientType | invitationrecipienttype_update | UPDATE | {public} |
 | MemberInvitation | memberinvitation_delete | DELETE | {public} |
 | MemberInvitation | memberinvitation_insert | INSERT | {public} |
 | MemberInvitation | memberinvitation_select | SELECT | {public} |
@@ -158,7 +166,7 @@ migration script ships with it.
 
 ## Columns
 
-<details><summary>Full column listing (215 columns)</summary>
+<details><summary>Full column listing (231 columns)</summary>
 
 | table | column | type | nullable |
 | --- | --- | --- | --- |
@@ -274,6 +282,15 @@ migration script ships with it.
 | Favorite | artworkId | text | NO |
 | Favorite | created_date | timestamp without time zone | NO |
 | Favorite | created_by_id | text | YES |
+| InvitationRecipientType | id | text | NO |
+| InvitationRecipientType | slug | text | NO |
+| InvitationRecipientType | label | text | NO |
+| InvitationRecipientType | grantsRole | USER-DEFINED | NO |
+| InvitationRecipientType | active | boolean | NO |
+| InvitationRecipientType | ordering | integer | NO |
+| InvitationRecipientType | created_date | timestamp without time zone | NO |
+| InvitationRecipientType | updated_date | timestamp without time zone | NO |
+| InvitationRecipientType | created_by_id | text | YES |
 | MemberInvitation | id | text | NO |
 | MemberInvitation | membershipId | text | YES |
 | MemberInvitation | email | text | NO |
@@ -285,6 +302,13 @@ migration script ships with it.
 | MemberInvitation | created_date | timestamp without time zone | NO |
 | MemberInvitation | updated_date | timestamp without time zone | NO |
 | MemberInvitation | created_by_id | text | YES |
+| MemberInvitation | recipientTypeId | text | YES |
+| MemberInvitation | recipientName | text | YES |
+| MemberInvitation | sentAt | timestamp without time zone | YES |
+| MemberInvitation | openedAt | timestamp without time zone | YES |
+| MemberInvitation | completedAt | timestamp without time zone | YES |
+| MemberInvitation | sentById | text | YES |
+| MemberInvitation | acceptedByUserId | text | YES |
 | Membership | id | text | NO |
 | Membership | userId | text | YES |
 | Membership | intakeId | text | YES |
