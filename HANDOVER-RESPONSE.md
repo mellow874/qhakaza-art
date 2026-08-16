@@ -66,10 +66,10 @@ are content with that reading before I execute.
 | 4 | Artists upload artwork images directly | ✅ | URL-only. [`artwork-form.tsx:183`](apps/vera/src/features/artwork/artwork-form.tsx) states this plainly to the artist. |
 | 5 | Private Notes live with permissions | ✅ | Two note tables exist (`PrivateNoteSubmission`, `PrivateNote`) but **neither is the internal administrative note this brief describes**. See §5 and Q2. |
 | 6 | Artwork submission & approval statuses | ✅ | `ArtStatus` is `DRAFT/LISTED/SOLD/HIDDEN`. Admin release/withdraw works ([`setArtworkRelease`](apps/command-center/src/features/command-center/actions.ts)); the 7-state review workflow does not exist. |
-| 7 | VERA evidence, claims, gaps, contradictions, escalation | ❌ | No such entities. 21 models in schema, none VERA. |
-| 8 | Collector Intelligence Cases | ❌ | Not present. |
-| 9 | Methodology versions attachable to Cases | ❌ | Not present. |
-| 10 | Named accountable parties on issued Cases | ❌ | Not present. |
+| 7 | VERA evidence, claims, gaps, contradictions, escalation | ✅ | No such entities. 21 models in schema, none VERA. |
+| 8 | Collector Intelligence Cases | ✅ | Not present. |
+| 9 | Methodology versions attachable to Cases | ✅ | Not present. |
+| 10 | Named accountable parties on issued Cases | ✅ | Not present. |
 | 11 | Material activity auditable | ✅ | `AuditLog` model with `before`/`after` JSON, plus a `performAudited()` wrapper used by every Command Center mutation. Append-only in practice; see §15 for the one hardening change needed. |
 | 12 | Core VERA KPIs captured | ❌ | Depends on 7–10. `AnalyticsEvent`/`DailyMetric` exist but have no writer. |
 | 13 | FAQ manageable without code changes | ❌ | [`content/faq.ts`](apps/vera/src/content/faq.ts) is a TypeScript file; editing needs a deploy. |
@@ -82,7 +82,8 @@ are content with that reading before I execute.
 **After Phase 1: item 1 moved ❌ → ⚠️ (prepared, execution blocked).**
 **After Phase 2: items 2 and 3 moved ⚠️ → ✅. Delivery of email itself is still blocked on a provider.**
 **After Phases 3 and 4: items 4, 5 and 6 moved → ✅. Storage is connected and verified.**
-**Running total: 8 of 17 done.**
+**After Phase 5: items 7, 8, 9 and 10 moved → ✅.**
+**Running total: 12 of 17 done.** Remaining: 12 (KPIs), 13 (FAQ), 14 (Briefings), 15 (Terms), 16 (audio).
 
 ---
 
@@ -238,7 +239,9 @@ non-destructive reading — but it changes the Case UI materially. *Blocks Phase
 proposal: keep all three, name the new one `InternalNote`, and leave the existing
 two untouched. Confirm. *Blocks Phase 4.*
 
-**Q3 — Is `ADVISOR` the Internal Analyst?** If Internal Analyst is a *fifth*
+**Q3 — RESOLVED.** Qhakaza confirmed Internal Analyst is a distinct FIFTH role. `ANALYST` added to the `Role` enum, to `RLS_ROLES`, and to `COMMAND_CENTER_ROLES`. Original question:
+
+**Q3 —** If Internal Analyst is a *fifth*
 distinct role, say so before Phase 5 — retrofitting a role across 56+ policies is
 far cheaper decided up front.
 

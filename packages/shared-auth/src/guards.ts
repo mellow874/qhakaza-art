@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from 'node:crypto';
 
 import { asSystem, fingerprintToken } from '@qhakaza/shared-db';
 

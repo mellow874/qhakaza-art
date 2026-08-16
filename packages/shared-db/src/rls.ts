@@ -21,7 +21,7 @@
  *
  *  3. The current actor reaches Postgres through two transaction-local
  *     settings, applied by `withActor()`:
- *         qhakaza.role     admin | advisor | artist | collector | system
+ *         qhakaza.role     admin | advisor | analyst | artist | collector | system
  *         qhakaza.user_id  the acting user's id
  *     With neither set, `current_setting(..., true)` returns NULL and the actor
  *     is treated as anonymous. Anything a policy does not explicitly grant to
@@ -35,6 +35,12 @@ import { CORE_ENTITIES, type CoreEntity } from './entities';
 export const RLS_ROLES = [
   'admin',
   'advisor',
+  /**
+   * Internal Analyst. Confirmed by Qhakaza as a FIFTH role, distinct from
+   * advisor: analysts work Cases, evidence and research, but have no part in
+   * concierge work and cannot change what anyone is allowed to do.
+   */
+  'analyst',
   'artist',
   'collector',
   /** Anonymous. The public artist site and the collector membership shell. */
@@ -184,6 +190,203 @@ export const RLS_MATRIX = {
     select: { admin: true, advisor: true, artist: true },
     insert: { admin: true, advisor: true },
     update: { admin: true, advisor: true },
+    delete: {},
+  },
+  // ---------------------------------------------------------------------
+  // VERA
+  //
+  // Staff only, throughout. There is deliberately no artist, collector or
+  // public row anywhere below: section 22 names internal analysis and
+  // unpublished evidence as things that must never reach client-facing
+  // permissions, and the strongest way to guarantee that is to grant nothing.
+  //
+  // ANALYST is granted alongside ADMIN and ADVISOR on the working tables, and
+  // withheld from the taxonomy: an analyst uses the categories, an admin
+  // decides what the categories are.
+  // ---------------------------------------------------------------------
+  EvidenceType: {
+    // Read by anyone doing the work; changed only by an admin. Taxonomy drift
+    // mid-Case would make two Cases incomparable.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  ReliabilityLevel: {
+    // Read by anyone doing the work; changed only by an admin. Taxonomy drift
+    // mid-Case would make two Cases incomparable.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  GapType: {
+    // Read by anyone doing the work; changed only by an admin. Taxonomy drift
+    // mid-Case would make two Cases incomparable.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  SpecialistCategory: {
+    // Read by anyone doing the work; changed only by an admin. Taxonomy drift
+    // mid-Case would make two Cases incomparable.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  PartyRole: {
+    // Read by anyone doing the work; changed only by an admin. Taxonomy drift
+    // mid-Case would make two Cases incomparable.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  Party: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Exhibition: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Publication: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  ProvenanceTransaction: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Source: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Evidence: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Claim: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Assessment: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Gap: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Contradiction: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  SpecialistEscalation: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  CaseArtwork: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  CaseEvidence: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  EvidenceClaim: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  ClaimAssessment: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  ArtworkParty: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  CaseParty: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  EvidenceSource: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  ArtworkExhibition: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  ArtworkPublication: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  MethodologyVersion: {
+    // An analyst applies a methodology; only an admin issues one. A method that
+    // anyone could revise is not a method anyone can be held to.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  IntelligenceCase: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  CaseVersion: {
+    // INSERT ONLY, AND NO UPDATE FOR ANYONE -- including admins.
+    //
+    // This is where "a revised Case never destroys a previously issued
+    // version" stops being a promise and becomes a database constraint. A
+    // revision inserts a new row; nothing can rewrite what was already issued.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: {},
     delete: {},
   },
   MediaAsset: {
