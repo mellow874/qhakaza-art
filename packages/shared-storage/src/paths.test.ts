@@ -5,6 +5,16 @@ import { MAX_IMAGE_BYTES, UnavailableStorageService, storageFromEnv } from './se
 
 const MB = 1024 * 1024;
 
+/**
+ * A stand-in environment.
+ *
+ * `NodeJS.ProcessEnv` requires NODE_ENV, so a bare object literal cannot be
+ * asserted to it directly. Going through `unknown` keeps these tests reading as
+ * the sparse fixtures they are rather than forcing every case to spell out
+ * variables it does not care about.
+ */
+const env = (values: Record<string, string>) => values as unknown as NodeJS.ProcessEnv;
+
 describe('buildStoragePath', () => {
   it('never uses the name the user supplied', () => {
     // A filename is attacker-controlled text. If it became part of the path,
@@ -127,7 +137,7 @@ describe('sniffImageType', () => {
 
 describe('storageFromEnv', () => {
   it('is unavailable when nothing is configured', () => {
-    const storage = storageFromEnv({} as NodeJS.ProcessEnv);
+    const storage = storageFromEnv(env({}));
 
     expect(storage.configured).toBe(false);
     expect(storage).toBeInstanceOf(UnavailableStorageService);
@@ -135,7 +145,7 @@ describe('storageFromEnv', () => {
 
   it('stays unavailable when only half the configuration is present', () => {
     // Half-configured is not configured. Failing here beats failing on upload.
-    const storage = storageFromEnv({ SUPABASE_URL: 'https://x.supabase.co' } as NodeJS.ProcessEnv);
+    const storage = storageFromEnv(env({ SUPABASE_URL: 'https://x.supabase.co' }));
     expect(storage.configured).toBe(false);
   });
 
@@ -149,10 +159,12 @@ describe('storageFromEnv', () => {
   });
 
   it('becomes available once both values are set', () => {
-    const storage = storageFromEnv({
-      SUPABASE_URL: 'https://example.supabase.co',
-      SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
-    } as NodeJS.ProcessEnv);
+    const storage = storageFromEnv(
+      env({
+        SUPABASE_URL: 'https://example.supabase.co',
+        SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+      }),
+    );
 
     expect(storage.configured).toBe(true);
     expect(storage.name).toBe('supabase');

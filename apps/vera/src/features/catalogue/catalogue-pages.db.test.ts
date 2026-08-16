@@ -9,13 +9,13 @@ const { getArtistBySlug, getBrowseWorks, getWorkById } = await import('./queries
  * The catalogue pages.
  *
  * Every one of these asserts the same thing from a different angle: nothing
- * reaches the public that is not LISTED work by an approved artist. The pages
+ * reaches the public that is not PUBLISHED work by an approved artist. The pages
  * themselves hold no conditions, so if these hold, the pages are safe.
  */
 
 async function makePiece(
   artistId: string,
-  overrides: { title?: string; status?: 'DRAFT' | 'LISTED' | 'SOLD' | 'HIDDEN' } = {},
+  overrides: { title?: string; status?: 'DRAFT' | 'PUBLISHED' | 'SOLD' | 'HIDDEN' } = {},
 ) {
   return prisma.artwork.create({
     data: {
@@ -27,7 +27,7 @@ async function makePiece(
       dimensions: '600 x 900 mm',
       price: 5000,
       currency: 'ZAR',
-      status: overrides.status ?? 'LISTED',
+      status: overrides.status ?? 'PUBLISHED',
     },
   });
 }

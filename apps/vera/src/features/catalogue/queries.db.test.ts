@@ -7,7 +7,7 @@ const { getFeaturedArtists, getFeaturedWorks } = await import('./queries');
 
 type PieceOverrides = {
   title?: string;
-  status?: 'DRAFT' | 'LISTED' | 'SOLD' | 'HIDDEN';
+  status?: 'DRAFT' | 'PUBLISHED' | 'SOLD' | 'HIDDEN';
   createdAt?: Date;
 };
 
@@ -22,7 +22,7 @@ async function makePiece(artistId: string, overrides: PieceOverrides = {}) {
       dimensions: '600 x 900 mm',
       price: 5000,
       currency: 'ZAR',
-      status: overrides.status ?? 'LISTED',
+      status: overrides.status ?? 'PUBLISHED',
       ...(overrides.createdAt ? { createdAt: overrides.createdAt } : {}),
     },
   });
@@ -141,8 +141,8 @@ describe('getFeaturedArtists', () => {
 
   it('counts only the available work on each storefront', async () => {
     const { profile } = await makeArtistWithProfile({ approved: true });
-    await makePiece(profile.id, { status: 'LISTED' });
-    await makePiece(profile.id, { status: 'LISTED' });
+    await makePiece(profile.id, { status: 'PUBLISHED' });
+    await makePiece(profile.id, { status: 'PUBLISHED' });
     await makePiece(profile.id, { status: 'SOLD' });
     await makePiece(profile.id, { status: 'DRAFT' });
 

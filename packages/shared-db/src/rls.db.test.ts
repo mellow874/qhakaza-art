@@ -108,7 +108,7 @@ beforeAll(async () => {
       medium: 'Oil',
       dimensions: '1x1',
       price: '100',
-      status: 'LISTED',
+      status: 'PUBLISHED',
     },
   });
 

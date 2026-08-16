@@ -6,14 +6,14 @@ const DEFAULT_ARTIST_LIMIT = 3;
 /**
  * What the public is allowed to see.
  *
- * Two conditions, both required: the piece is LISTED (not a draft, not sold,
+ * Two conditions, both required: the piece is PUBLISHED (not a draft, not sold,
  * not hidden by an admin) *and* its artist has been approved. Approval is a
  * real gate, so an unapproved storefront is invisible until an admin acts.
  *
  * Every public query must reuse this rather than rewriting the conditions.
  */
 export const PUBLICLY_VISIBLE_WORK = {
-  status: 'LISTED',
+  status: 'PUBLISHED',
   artist: { approved: true },
 } as const;
 
@@ -40,16 +40,16 @@ export async function getFeaturedArtists({
   const artists = await prisma.artist.findMany({
     where: {
       approved: true,
-      artworks: { some: { status: 'LISTED' } },
+      artworks: { some: { status: 'PUBLISHED' } },
     },
     select: {
       id: true,
       displayName: true,
       slug: true,
       statement: true,
-      _count: { select: { artworks: { where: { status: 'LISTED' } } } },
+      _count: { select: { artworks: { where: { status: 'PUBLISHED' } } } },
       artworks: {
-        where: { status: 'LISTED' },
+        where: { status: 'PUBLISHED' },
         orderBy: { createdAt: 'desc' },
         take: 1,
         select: { images: true },
@@ -106,7 +106,7 @@ export async function getArtistBySlug(slug: string) {
       slug: true,
       statement: true,
       artworks: {
-        where: { status: 'LISTED' },
+        where: { status: 'PUBLISHED' },
         orderBy: { createdAt: 'desc' },
         select: {
           id: true,

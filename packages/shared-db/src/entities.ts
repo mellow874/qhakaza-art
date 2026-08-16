@@ -17,6 +17,9 @@ export const CORE_ENTITIES = [
   'MemberInvitation',
   'InvitationRecipientType',
   'MediaAsset',
+  'InternalNote',
+  'InternalNoteRevision',
+  'ArtworkReviewRequest',
   'Artist',
   'Artwork',
   'NewsArticle',
@@ -51,6 +54,11 @@ export const ENTITY_DOMAIN = {
   // Spans both sides: artwork photographs are supply-side, evidence
   // documents are internal. The row's own confidentiality decides.
   MediaAsset: 'platform',
+  // Staff writing to staff. Never readable outside Qhakaza.
+  InternalNote: 'platform',
+  InternalNoteRevision: 'platform',
+  // The artist must be able to read the question asked of them.
+  ArtworkReviewRequest: 'supply',
   ActivationAttempt: 'collector',
   PrivateNoteSubmission: 'collector',
 

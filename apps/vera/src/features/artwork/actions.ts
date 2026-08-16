@@ -12,7 +12,7 @@ import { artPieceDraftSchema } from '@/lib/validation/art';
  *
  * Saves as **DRAFT**, always. An artist can describe their work; only the
  * Command Center can release it, and only once the artist is approved. There is
- * deliberately no path from this form to LISTED — that decision is not the
+ * deliberately no path from this form to PUBLISHED — that decision is not the
  * artist's to make, and a submission form that could publish would make vetting
  * decorative.
  *
@@ -75,7 +75,7 @@ export async function submitArtwork(input: unknown): Promise<SubmitArtworkResult
           price: price ?? 0,
           currency: currency ?? 'ZAR',
           // `status` is deliberately absent — the schema default is DRAFT, and
-          // naming it here would invite someone to pass LISTED one day.
+          // naming it here would invite someone to pass PUBLISHED one day.
           createdById: userId,
         },
         select: { id: true },
@@ -88,6 +88,53 @@ export async function submitArtwork(input: unknown): Promise<SubmitArtworkResult
     return { ok: true, artworkId: artwork.id };
   } catch (error) {
     console.error('submitArtwork failed', error);
+    return { ok: false, error: 'UNKNOWN' };
+  }
+}
+
+/**
+ * Hand a work to Qhakaza for review.
+ *
+ * The only way out of DRAFT, and deliberately one-way: once submitted, an
+ * artist cannot silently edit the record a reviewer is reading. If something
+ * needs changing, the reviewer returns it with a question.
+ *
+ * Also the resubmission path. A work that came back as
+ * RETURNED_FOR_INFORMATION goes to SUBMITTED again, which is what closes the
+ * loop for the artist.
+ */
+export async function submitForReview(input: { artworkId: string }): Promise<SubmitArtworkResult> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return { ok: false, error: 'UNAUTHENTICATED' };
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  if (user?.role !== 'ARTIST') return { ok: false, error: 'FORBIDDEN' };
+
+  try {
+    const result = await withActor({ role: 'artist', userId }, async (tx) => {
+      const artist = await tx.artist.findUnique({ where: { userId }, select: { id: true } });
+      if (!artist) return null;
+
+      // Guarded in the where clause: an artist may submit only their OWN work,
+      // and only from a status that can be submitted.
+      return tx.artwork.updateMany({
+        where: {
+          id: input.artworkId,
+          artistId: artist.id,
+          status: { in: ['DRAFT', 'RETURNED_FOR_INFORMATION'] },
+        },
+        data: { status: 'SUBMITTED' },
+      });
+    });
+
+    if (result === null) return { ok: false, error: 'NO_PROFILE' };
+    if (result.count === 0) return { ok: false, error: 'INVALID' };
+
+    revalidatePath('/artist/dashboard');
+    return { ok: true, artworkId: input.artworkId };
+  } catch (error) {
+    console.error('submitForReview failed', error);
     return { ok: false, error: 'UNKNOWN' };
   }
 }
@@ -117,6 +164,14 @@ export async function getMyStudio() {
         currency: true,
         status: true,
         createdAt: true,
+        // The open question, if a reviewer has asked one. Without this the
+        // artist sees "returned for information" and no way to learn why.
+        reviewRequests: {
+          where: { resolvedAt: null },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { id: true, request: true, createdAt: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });

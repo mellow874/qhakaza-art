@@ -79,7 +79,9 @@ export const OWNERSHIP: Partial<Record<CoreEntity, string>> = {
 /** What "vetted and released" means, per entity. Never raw submissions. */
 export const RELEASED: Partial<Record<CoreEntity, string>> = {
   Artist: `"approved" = true`,
-  Artwork: `"status" = 'LISTED' AND "artistId" IN (SELECT "id" FROM "Artist" WHERE "approved" = true)`,
+  // PUBLISHED only. Not APPROVED: approval is the vetting decision, publication
+  // is the release, and an approved-but-unreleased work must stay invisible.
+  Artwork: `"status" = 'PUBLISHED' AND "artistId" IN (SELECT "id" FROM "Artist" WHERE "approved" = true)`,
   NewsArticle: `"status" = 'PUBLISHED'`,
 };
 
@@ -156,6 +158,32 @@ export const RLS_MATRIX = {
     select: { admin: true, advisor: true, artist: true, collector: true, system: true },
     insert: { admin: true },
     update: { admin: true },
+    delete: {},
+  },
+  InternalNote: {
+    // Staff only, with no policy at all for artists or collectors -- the
+    // strongest form of "internal". The brief requires this to be enforced by
+    // RLS rather than by the UI, so there is deliberately no row here that
+    // could be widened by a careless change to a screen.
+    select: { admin: true, advisor: true },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  InternalNoteRevision: {
+    // Append-only history. Nobody edits or deletes a revision, including staff:
+    // a revision log that can be rewritten records nothing.
+    select: { admin: true, advisor: true },
+    insert: { admin: true, advisor: true },
+    update: {},
+    delete: {},
+  },
+  ArtworkReviewRequest: {
+    // The artist MUST be able to read this -- being told "returned for
+    // information" without the question is useless. They cannot write one.
+    select: { admin: true, advisor: true, artist: true },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
     delete: {},
   },
   MediaAsset: {

@@ -69,7 +69,7 @@ export async function setArtistApproval(input: {
  * Release a work to members.
  *
  * Under the current decision — one shared pool, no per-member curation — this
- * IS the release mechanism: an approved artist's work moving to LISTED is what
+ * IS the release mechanism: an approved artist's work moving to PUBLISHED is what
  * makes it visible in the Collector Platform. When a Match/CuratedRoute entity
  * exists, this is where per-member routing would attach.
  */
@@ -92,7 +92,7 @@ export async function setArtworkRelease(input: {
   // members through the back door. The gate is here, not only in the query.
   if (input.release && !artwork.artist.approved) return { ok: false, error: 'INVALID' };
 
-  const next = input.release ? 'LISTED' : 'HIDDEN';
+  const next = input.release ? 'PUBLISHED' : 'HIDDEN';
 
   try {
     await performAudited({

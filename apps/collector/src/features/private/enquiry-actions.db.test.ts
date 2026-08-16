@@ -16,7 +16,7 @@ function signedInAs(role: string | null) {
   auth.mockResolvedValue(role ? { user: { id: 'user-1', role } } : null);
 }
 
-async function seed({ artworkStatus = 'LISTED', artistApproved = true } = {}) {
+async function seed({ artworkStatus = 'PUBLISHED', artistApproved = true } = {}) {
   await prisma.memberInvitation.create({
     data: {
       email: 'member@test.local',
@@ -45,7 +45,7 @@ async function seed({ artworkStatus = 'LISTED', artistApproved = true } = {}) {
       medium: 'Mixed media',
       dimensions: '80 x 60 cm',
       price: '2600',
-      status: artworkStatus as 'LISTED' | 'DRAFT',
+      status: artworkStatus as 'PUBLISHED' | 'DRAFT',
     },
   });
 

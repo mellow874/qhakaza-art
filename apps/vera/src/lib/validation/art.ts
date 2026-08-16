@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const ART_STATUSES = ['DRAFT', 'LISTED', 'SOLD', 'HIDDEN'] as const;
+export const ART_STATUSES = ['DRAFT', 'PUBLISHED', 'SOLD', 'HIDDEN'] as const;
 export type ArtStatus = (typeof ART_STATUSES)[number];
 
 export const CURRENCIES = ['ZAR', 'USD', 'EUR', 'GBP'] as const;
@@ -42,7 +42,7 @@ const artPieceFields = {
 
 /**
  * Everything a piece needs before it can be shown to collectors.
- * A DRAFT cannot be promoted to LISTED unless it satisfies this.
+ * A DRAFT cannot be promoted to PUBLISHED unless it satisfies this.
  */
 export const artPieceListedSchema = z.object(artPieceFields);
 
@@ -53,7 +53,7 @@ export const artPieceDraftSchema = z
   .extend({ title: artPieceFields.title });
 
 export function artPieceSchemaForStatus(status: ArtStatus) {
-  return status === 'LISTED' || status === 'SOLD' ? artPieceListedSchema : artPieceDraftSchema;
+  return status === 'PUBLISHED' || status === 'SOLD' ? artPieceListedSchema : artPieceDraftSchema;
 }
 
 export type ArtPieceListedInput = z.infer<typeof artPieceListedSchema>;

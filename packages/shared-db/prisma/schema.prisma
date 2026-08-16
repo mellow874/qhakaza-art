@@ -48,11 +48,40 @@ enum Role {
   ADVISOR
 }
 
+/// The artwork review workflow, as specified by the handover brief:
+///
+///   DRAFT -> SUBMITTED -> UNDER_REVIEW -> APPROVED -> PUBLISHED
+///
+/// plus RETURNED_FOR_INFORMATION and REJECTED, which can interrupt it, and
+/// SOLD and HIDDEN, which follow publication.
+///
+/// APPROVED and PUBLISHED are deliberately distinct. Approval is the vetting
+/// decision; publication is the moment collectors can see it. Keeping them
+/// apart means work can be approved in a batch and released deliberately.
+///
+/// LISTED is the ORIGINAL spelling of PUBLISHED, kept because PostgreSQL
+/// cannot drop an enum value without recreating the type. Existing rows were
+/// migrated; nothing writes it any more.
 enum ArtStatus {
+  /// The artist is still working on the record. Only they can see it.
   DRAFT
-  LISTED
+  /// Handed to Qhakaza. The artist can no longer edit it silently.
+  SUBMITTED
+  /// A reviewer has picked it up.
+  UNDER_REVIEW
+  /// Sent back with a question. The artist can see the request and resubmit.
+  RETURNED_FOR_INFORMATION
+  /// Vetted, but not yet visible to anyone outside Qhakaza.
+  APPROVED
+  /// Live. The only status the public may see.
+  PUBLISHED
+  /// Declined. Retained, never deleted.
+  REJECTED
   SOLD
   HIDDEN
+
+  /// @deprecated original spelling of PUBLISHED
+  LISTED
 }
 
 enum OrderStatus {
@@ -233,8 +262,9 @@ model Artwork {
   updatedAt   DateTime  @updatedAt @map("updated_date")
   createdById String?   @map("created_by_id")
 
-  artist    Artist                  @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  orders    Order[]
+  artist         Artist                 @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  reviewRequests ArtworkReviewRequest[]
+  orders         Order[]
   favorites Favorite[]
   notes     PrivateNoteSubmission[]
 
@@ -350,6 +380,102 @@ model Membership {
 /// `tokenHash` stores a SHA-256 of the token, never the token itself: a leaked
 /// database dump must not hand over working invitations. The plaintext exists
 /// only in the invitation email.
+/// A note written by staff, about anything.
+///
+/// THIS IS THE INTERNAL ADMINISTRATIVE NOTE from the handover brief, and it is
+/// a THIRD concept distinct from the two that already carry the name:
+///
+///   PrivateNote            a prospect's RSVP survey, collector-facing
+///   PrivateNoteSubmission  a member's enquiry to their advisor
+///   InternalNote           this: staff writing to staff, never seen outside
+///
+/// None of the three was repurposed into another. They have different authors,
+/// different readers and different lifetimes.
+///
+/// SEPARATE FROM EVIDENCE, DELIBERATELY. A note never becomes part of a
+/// Collector Intelligence Case by accident: `convertedToEvidenceId` is set only
+/// when an authorised user deliberately converts it. Private comments must
+/// never surface in a Case simply because they were attached to the same
+/// artwork.
+model InternalNote {
+  id String @id @default(cuid())
+
+  /// What the note is about: "Artist", "Artwork", "CollectorIntake", "Case".
+  /// A string rather than an enum so the VERA phases can attach notes to their
+  /// own records without a migration.
+  subjectType String
+  subjectId   String
+
+  body String
+
+  /// Set only by a deliberate conversion. Until then the note is not evidence
+  /// and must not be read as though it were.
+  convertedToEvidenceId String?
+  convertedAt           DateTime?
+  convertedById         String?
+
+  authorId String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  revisions InternalNoteRevision[]
+
+  @@index([subjectType, subjectId])
+  @@index([authorId])
+  @@index([createdById])
+}
+
+/// The previous text of a note, kept whenever it is materially changed.
+///
+/// Append-only. The brief requires notes to preserve an audit history, and a
+/// note that can be quietly rewritten is not a record of anything. Editing
+/// writes the OLD body here first, so the chain reads backwards from the
+/// current text.
+model InternalNoteRevision {
+  id     String @id @default(cuid())
+  noteId String
+
+  /// The body as it was before this edit.
+  previousBody String
+  editedById   String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  note InternalNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([noteId, createdAt])
+  @@index([createdById])
+}
+
+/// A reviewer sending a submission back with a question.
+///
+/// A record rather than a status alone, because "returned for information" is
+/// useless to an artist who cannot see what was asked. Kept after resolution:
+/// what was asked, and when it was answered, is part of the work's history.
+model ArtworkReviewRequest {
+  id        String @id @default(cuid())
+  artworkId String
+
+  /// What the reviewer needs. Shown to the artist verbatim.
+  request String
+
+  requestedById String?
+  resolvedAt    DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artwork Artwork @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  @@index([artworkId, resolvedAt])
+  @@index([createdById])
+}
+
 /// How sensitive a stored file is.
 ///
 /// Section 22 requires that unpublished evidence and internal analysis are

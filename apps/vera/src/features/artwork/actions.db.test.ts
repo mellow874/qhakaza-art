@@ -70,7 +70,7 @@ describe('submitArtwork', () => {
   it('ignores a status in the payload', async () => {
     await makeArtist({ approved: true });
 
-    await submitArtwork({ ...VALID, status: 'LISTED' });
+    await submitArtwork({ ...VALID, status: 'PUBLISHED' });
 
     expect((await prisma.artwork.findFirstOrThrow()).status).toBe('DRAFT');
   });

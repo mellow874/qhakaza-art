@@ -36,10 +36,27 @@ const STATUS: Record<string, { label: string; note: string; tone: 'live' | 'wait
   {
     DRAFT: {
       label: 'Draft',
-      note: 'With Qhakaza. Not yet visible to collectors.',
+      note: 'Yours to edit. Submit it when you are ready for Qhakaza to review it.',
       tone: 'waiting',
     },
-    LISTED: { label: 'Released', note: 'Visible to member collectors.', tone: 'live' },
+    SUBMITTED: {
+      label: 'Submitted',
+      note: 'With Qhakaza, waiting to be picked up.',
+      tone: 'waiting',
+    },
+    UNDER_REVIEW: { label: 'Under review', note: 'A reviewer is reading it now.', tone: 'waiting' },
+    RETURNED_FOR_INFORMATION: {
+      label: 'Needs more',
+      note: 'Qhakaza has asked for something. See the request below.',
+      tone: 'waiting',
+    },
+    APPROVED: {
+      label: 'Approved',
+      note: 'Accepted. It will appear once Qhakaza releases it.',
+      tone: 'live',
+    },
+    PUBLISHED: { label: 'Released', note: 'Visible to member collectors.', tone: 'live' },
+    REJECTED: { label: 'Not accepted', note: 'Qhakaza has declined this work.', tone: 'closed' },
     SOLD: { label: 'Sold', note: 'No longer available.', tone: 'closed' },
     HIDDEN: { label: 'Withdrawn', note: 'Taken down by Qhakaza.', tone: 'closed' },
   };
@@ -96,7 +113,7 @@ function ProfileStanding({ artist }: { artist: Studio['artist'] }) {
 }
 
 export function Studio({ artist, artworks }: Studio) {
-  const released = artworks.filter((work) => work.status === 'LISTED').length;
+  const released = artworks.filter((work) => work.status === 'PUBLISHED').length;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-12 px-6 py-16">
@@ -156,6 +173,27 @@ export function Studio({ artist, artworks }: Studio) {
                     {/* The status line is the feedback loop from the Command
                         Center — the artist should never have to ask. */}
                     <span className="text-body text-sm">{status.note}</span>
+
+                    {/* The actual question, verbatim. A status alone tells an
+                        artist that something is wrong but not what. */}
+                    {work.reviewRequests?.[0] && (
+                      <span className="border-accent bg-accent/5 text-body mt-2 border-l-2 py-2 pl-3 text-sm leading-relaxed">
+                        <strong className="text-heading block text-xs tracking-wide uppercase">
+                          Qhakaza asked
+                        </strong>
+                        {work.reviewRequests[0].request}
+                      </span>
+                    )}
+
+                    {(work.status === 'DRAFT' ||
+                      work.status === 'RETURNED_FOR_INFORMATION') && (
+                      <Link
+                        href={`/artist/work/${work.id}`}
+                        className="text-accent caps mt-2 w-fit text-xs hover:underline"
+                      >
+                        {work.status === 'DRAFT' ? 'Submit for review' : 'Resubmit'}
+                      </Link>
+                    )}
                   </div>
 
                   <div className="flex flex-col items-end gap-2">

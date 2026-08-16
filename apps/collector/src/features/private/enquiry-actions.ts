@@ -50,7 +50,7 @@ export async function submitEnquiry(input: unknown): Promise<EnquiryResult> {
 
       if (parsed.data.artworkId) {
         const released = await tx.artwork.findFirst({
-          where: { id: parsed.data.artworkId, status: 'LISTED', artist: { approved: true } },
+          where: { id: parsed.data.artworkId, status: 'PUBLISHED', artist: { approved: true } },
           select: { id: true },
         });
         if (!released) return false;

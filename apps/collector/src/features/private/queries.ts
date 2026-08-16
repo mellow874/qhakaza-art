@@ -4,7 +4,7 @@ import { withActor } from '@qhakaza/shared-db';
  * What a member is allowed to see.
  *
  * Two conditions, both required: the artist has been **approved** by the
- * Command Center, and the work has been **released** to LISTED. A DRAFT or
+ * Command Center, and the work has been **released** to PUBLISHED. A DRAFT or
  * HIDDEN piece, or anything by an unvetted artist, is a raw submission and must
  * never reach a collector.
  *
@@ -19,7 +19,7 @@ import { withActor } from '@qhakaza/shared-db';
  * vetting gate is real; the personalisation is absent, not faked.
  */
 export const RELEASED_TO_MEMBERS = {
-  status: 'LISTED',
+  status: 'PUBLISHED',
   artist: { approved: true },
 } as const;
 
@@ -49,13 +49,13 @@ export type ReleasedArtwork = Awaited<ReturnType<typeof getReleasedArtworks>>[nu
 export async function getReleasedArtists({ limit = 12 }: { limit?: number } = {}) {
   const artists = await withActor({ role: 'collector' }, (tx) =>
     tx.artist.findMany({
-      where: { approved: true, artworks: { some: { status: 'LISTED' } } },
+      where: { approved: true, artworks: { some: { status: 'PUBLISHED' } } },
       select: {
         id: true,
         displayName: true,
         slug: true,
         statement: true,
-        _count: { select: { artworks: { where: { status: 'LISTED' } } } },
+        _count: { select: { artworks: { where: { status: 'PUBLISHED' } } } },
       },
       orderBy: { createdAt: 'desc' },
       take: limit,

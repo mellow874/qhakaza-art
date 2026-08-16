@@ -6,8 +6,9 @@ import { requireRole } from '@qhakaza/shared-auth/guards';
 import { auth } from '@qhakaza/shared-auth/server';
 import { buttonStyles } from '@qhakaza/shared-ui';
 
-import { getMyStudio } from '@/features/artwork/actions';
+import { getMyStudio, submitForReview } from '@/features/artwork/actions';
 import { ImageUploader } from '@/features/artwork/image-uploader';
+import { SubmitForReview } from '@/features/artwork/submit-for-review';
 import {
   confirmUpload,
   getStorageStatus,
@@ -88,6 +89,13 @@ export default async function WorkPhotographsPage({ params }: Props) {
           removeUpload={removeUpload}
         />
       </section>
+
+      {(work.status === 'DRAFT' || work.status === 'RETURNED_FOR_INFORMATION') && (
+        <section className="border-line/70 flex flex-col gap-4 border-t pt-8">
+          <h2 className="text-2xl">Ready for Qhakaza?</h2>
+          <SubmitForReview artworkId={id} status={work.status} onSubmit={submitForReview} />
+        </section>
+      )}
 
       <Link
         href="/artist/dashboard"

@@ -36,7 +36,7 @@ async function vettingQueue(tx: Tx) {
       take: 25,
     }),
     tx.artwork.findMany({
-      where: { status: { not: 'LISTED' } },
+      where: { status: { not: 'PUBLISHED' } },
       select: {
         id: true,
         title: true,
@@ -173,7 +173,7 @@ async function analytics(tx: Tx) {
     Promise.all([
       tx.artist.count(),
       tx.artist.count({ where: { approved: true } }),
-      tx.artwork.count({ where: { status: 'LISTED' } }),
+      tx.artwork.count({ where: { status: 'PUBLISHED' } }),
       tx.collectorIntake.count(),
       tx.membership.count({ where: { status: 'ACTIVE' } }),
     ]),

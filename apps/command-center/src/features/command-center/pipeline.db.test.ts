@@ -184,7 +184,7 @@ describe('artist -> admin -> collector -> admin', () => {
         medium: 'Print',
         dimensions: '30x40',
         price: '900',
-        status: 'LISTED',
+        status: 'PUBLISHED',
       },
     });
 
@@ -207,7 +207,7 @@ describe('artist -> admin -> collector -> admin', () => {
  */
 function visibleToMembers() {
   return prisma.artwork.findMany({
-    where: { status: 'LISTED', artist: { approved: true } },
+    where: { status: 'PUBLISHED', artist: { approved: true } },
     select: { title: true },
   });
 }
