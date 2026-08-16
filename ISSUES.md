@@ -104,6 +104,21 @@ merged deliberately rather than by side effect.
 
 ---
 
+### B8 - Platform is not integrated with Supabase beyond hosted Postgres
+
+Found during the Phase 0 audit of the 14 August handover brief, which assumes
+Supabase auth and storage buckets are in use. Neither is. There is no
+`@supabase/supabase-js` in the monorepo; auth is Auth.js with bcrypt and JWT
+against our own `User` table, and no file storage of any kind exists.
+
+Consequence: the Supabase migration is materially smaller than the brief
+describes, and native artwork upload is a from-scratch build rather than a
+change to an existing integration.
+
+Flagged for approval in `HANDOVER-RESPONSE.md` rather than worked around.
+
+---
+
 ## Open — deferred to a later phase
 
 ### I2 — Photography is partly supplied
