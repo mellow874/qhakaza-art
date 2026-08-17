@@ -16,24 +16,30 @@ export const privateNote = {
   /**
    * The background music.
    *
-   * SWAPPABLE WITHOUT A CODE CHANGE. The URL comes from
-   * NEXT_PUBLIC_AUDIO_TRACK_URL when set, so dropping in the licensed track is
-   * an environment variable — or a storage URL — rather than an edit here.
+   * The supplied track, in place since 17 August. It arrived as
+   * `AUD-20260817-WA0004.mp3` - a WhatsApp export name - and was renamed:
+   * the filename ends up in a public URL, and that one told a visitor how the
+   * file reached us rather than what it is.
    *
-   * ⚠ The default is a 3-second SILENT placeholder. It is a real audio file, so
-   * loading, looping, muting and failure all behave exactly as they will with
-   * the real track; it simply makes no sound. Silence rather than a stand-in
-   * tune, because shipping someone else's music into a demo is a licensing
-   * question nobody asked for.
+   * SWAPPABLE WITHOUT A CODE CHANGE. NEXT_PUBLIC_AUDIO_TRACK_URL overrides the
+   * path when set, so a future track can be pointed at from configuration or
+   * from storage. It is not required: the default below is the real track, so
+   * nothing extra needs setting in Vercel for this to work.
    *
-   * Playback is opt-in and starts MUTED. Browsers block un-muted autoplay, so
-   * an autoplaying page would sit silent and look broken.
+   * `isPlaceholder` is derived rather than hand-set, so the "this plays
+   * silence" notice can never be left on a page that is actually playing
+   * music, or off one that is not.
+   *
+   * Playback is opt-in. Browsers block un-muted autoplay, so an autoplaying
+   * page would sit silent and look broken - and music that starts uninvited is
+   * hostile on a page someone opened from an email.
    */
   audio: {
     src: (process.env.NEXT_PUBLIC_AUDIO_TRACK_URL ||
-      '/audio/placeholder-silence.wav') as string | null,
-    /** True while the placeholder is in use, so the page can say so. */
-    isPlaceholder: !process.env.NEXT_PUBLIC_AUDIO_TRACK_URL,
+      '/audio/private-note-background.mp3') as string | null,
+    get isPlaceholder(): boolean {
+      return (this.src ?? '').includes('placeholder-silence');
+    },
     title: 'A note to sit with',
     placeholder: 'Music will play here once the track is added.',
     placeholderNote: 'The final track has not been supplied yet, so this plays silence.',

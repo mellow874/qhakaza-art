@@ -45,14 +45,6 @@ Needs: the actual questions and answers, or a decision to drop the page.
 Answers about pricing, subscriptions or regulatory status are factual claims
 about the business and will not be invented.
 
-### B3 — Background music for the Private Note
-
-No audio file exists anywhere in the repo. The player is built and renders a
-clearly-labelled unavailable state.
-
-Needs: the track. Drop it in `apps/collector/public/audio/` and set
-`privateNote.audio.src` — nothing else changes.
-
 ### B4 — What should appear first on the Command Center?
 
 Currently: Verification & vetting, then Collector intake, Communications,

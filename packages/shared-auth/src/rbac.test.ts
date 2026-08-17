@@ -13,11 +13,18 @@ describe('requiredRolesForPath', () => {
     expect(requiredRolesForPath('/collector/favourites')).toEqual(['COLLECTOR']);
   });
 
-  it('admits both Command Center roles to the admin area', () => {
+  it('admits all three Command Center roles to the admin area', () => {
     // ADVISOR joined ADMIN here in Phase 1: advisors run matching and concierge
-    // work inside the Command Center without being platform administrators.
-    expect(requiredRolesForPath('/admin')).toEqual(['ADMIN', 'ADVISOR']);
-    expect(requiredRolesForPath('/admin/orders/ord_1')).toEqual(['ADMIN', 'ADVISOR']);
+    // work without being platform administrators. ANALYST joined in Phase 5,
+    // confirmed by Qhakaza as a distinct fifth role - analysts work Cases and
+    // evidence, which live in the Command Center.
+    //
+    // Being admitted to the AREA is not the same as being able to read
+    // everything in it: the RLS matrix grants `analyst` nothing on the
+    // collector tables, and `vera.db.test.ts` asserts an analyst sees zero
+    // collector applications.
+    expect(requiredRolesForPath('/admin')).toEqual(['ADMIN', 'ADVISOR', 'ANALYST']);
+    expect(requiredRolesForPath('/admin/orders/ord_1')).toEqual(['ADMIN', 'ADVISOR', 'ANALYST']);
   });
 
   it('leaves /private to the Collector Platform, not the edge proxy', () => {
