@@ -15,10 +15,17 @@ export const brand = {
  * Vera — the artist website. A different application on a different domain, so
  * it cannot be reached with a path.
  *
- * `NEXT_PUBLIC_` because the footer is rendered on the client too; the value is
- * inlined at build time. The localhost fallback keeps development working
- * without configuration, and is never what production uses because every
- * deployment sets the variable.
+ * `NEXT_PUBLIC_` because the footer is rendered on the client too, so the value
+ * is inlined at build time.
+ *
+ * THE VARIABLE IS OPTIONAL. The fallback below is Vera's live address, so this
+ * link is correct in production whether or not anything is configured. That
+ * matters because Vercel warns when you add a NEXT_PUBLIC_ variable - rightly,
+ * since the prefix publishes the value to the browser - and there is no reason
+ * to accept that warning for a value that is already right.
+ *
+ * A public website address is not a secret; it appears in the page's own HTML.
+ * But the setting that does not need to exist is the one that cannot be wrong.
  */
 export const VERA_URL = process.env.NEXT_PUBLIC_VERA_URL ?? 'https://qhakaza-art-vera.vercel.app/';
 

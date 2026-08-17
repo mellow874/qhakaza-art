@@ -303,8 +303,9 @@ export function InvitationPanel({
           {issued.link.includes('localhost') && (
             <p className="text-danger text-xs leading-relaxed">
               This link points at <strong>localhost</strong>, so it will only open on this
-              computer. Set NEXT_PUBLIC_COLLECTOR_URL (and NEXT_PUBLIC_VERA_URL for artists) on
-              the Command Center before sending invitations to anyone else.
+              computer. Set <strong>COLLECTOR_URL</strong> (and <strong>VERA_URL</strong> for
+              artists) on the Command Center, then redeploy, before sending invitations to
+              anyone else.
             </p>
           )}
 
