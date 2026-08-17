@@ -257,64 +257,82 @@ async function invitations(tx: Tx) {
  * "design so new KPIs can be added without major redevelopment" asks for.
  */
 async function dashboard(tx: Tx) {
-  const [
-    invitations,
-    artists,
-    artworkByStatus,
-    evidence,
-    openGaps,
-    contradictions,
-    escalations,
-    casesByStatus,
-    issuedVersions,
-  ] = await Promise.all([
-    tx.memberInvitation.groupBy({ by: ['status'], _count: true }),
-    tx.artist.groupBy({ by: ['approved'], _count: true }),
-    tx.artwork.groupBy({ by: ['status'], _count: true }),
-    tx.evidence.count(),
-    tx.gap.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
-    tx.contradiction.count({ where: { resolvedAt: null } }),
-    tx.specialistEscalation.count({ where: { status: { not: 'ANSWERED' } } }),
-    tx.intelligenceCase.groupBy({ by: ['status'], _count: true }),
-    tx.caseVersion.count({ where: { issuedAt: { not: null } } }),
-  ]);
+  /*
+   * ONE round trip, not nine.
+   *
+   * These were nine separate counts. Each is fast, but the database is a
+   * managed instance in another region and every query costs a round trip -
+   * and because the actor is transaction-scoped, they all share one connection
+   * and therefore run strictly one after another. Nine round trips became
+   * several seconds of a page load that does nothing but count.
+   *
+   * Promise.all does not help here: a transaction has one connection, so the
+   * queries queue regardless. Fewer statements is the only real fix.
+   *
+   * RLS still applies - this runs as the declared actor like any other query,
+   * so a role that may not read Evidence counts zero of them rather than
+   * seeing a total it should not.
+   */
+  const [row] = await tx.$queryRawUnsafe<
+    Record<string, bigint>[]
+  >(`
+    SELECT
+      (SELECT count(*) FROM "MemberInvitation" WHERE "status" IN ('CREATED','SENT','OPENED'))      AS inv_outstanding,
+      (SELECT count(*) FROM "MemberInvitation" WHERE "status" = 'ACCEPTED')                        AS inv_accepted,
+      (SELECT count(*) FROM "MemberInvitation" WHERE "status" = 'COMPLETED')                       AS inv_completed,
+      (SELECT count(*) FROM "MemberInvitation")                                                    AS inv_total,
+      (SELECT count(*) FROM "Artist")                                                              AS artists_total,
+      (SELECT count(*) FROM "Artist" WHERE "approved")                                             AS artists_approved,
+      (SELECT count(*) FROM "Artist" WHERE NOT "approved")                                         AS artists_awaiting,
+      (SELECT count(*) FROM "Artwork" WHERE "status" = 'DRAFT')                                    AS art_draft,
+      (SELECT count(*) FROM "Artwork" WHERE "status" = 'SUBMITTED')                                AS art_submitted,
+      (SELECT count(*) FROM "Artwork" WHERE "status" = 'UNDER_REVIEW')                             AS art_under_review,
+      (SELECT count(*) FROM "Artwork" WHERE "status" = 'RETURNED_FOR_INFORMATION')                 AS art_returned,
+      (SELECT count(*) FROM "Artwork" WHERE "status" = 'APPROVED')                                 AS art_approved,
+      (SELECT count(*) FROM "Artwork" WHERE "status" = 'PUBLISHED')                                AS art_published,
+      (SELECT count(*) FROM "Artwork" WHERE "status" = 'REJECTED')                                 AS art_rejected,
+      (SELECT count(*) FROM "Evidence")                                                            AS evidence_records,
+      (SELECT count(*) FROM "Gap" WHERE "status" IN ('OPEN','IN_PROGRESS'))                        AS gaps_open,
+      (SELECT count(*) FROM "Contradiction" WHERE "resolvedAt" IS NULL)                            AS contradictions_open,
+      (SELECT count(*) FROM "SpecialistEscalation" WHERE "status" <> 'ANSWERED')                   AS escalations_open,
+      (SELECT count(*) FROM "IntelligenceCase")                                                    AS cases_total,
+      (SELECT count(*) FROM "IntelligenceCase" WHERE "status" = 'ISSUED')                          AS cases_issued,
+      (SELECT count(*) FROM "CaseVersion" WHERE "issuedAt" IS NOT NULL)                            AS versions_issued
+  `);
 
-  const tally = (rows: { _count: number }[], key: string, match: unknown) =>
-    rows.find((row) => (row as Record<string, unknown>)[key] === match)?._count ?? 0;
-
-  const sum = (rows: { _count: number }[]) => rows.reduce((total, row) => total + row._count, 0);
+  const n = (key: string) => Number(row?.[key] ?? 0);
 
   return {
     invitations: {
-      total: sum(invitations),
-      sent: tally(invitations, 'status', 'SENT') + tally(invitations, 'status', 'OPENED'),
-      accepted: tally(invitations, 'status', 'ACCEPTED'),
-      completed: tally(invitations, 'status', 'COMPLETED'),
-      outstanding:
-        tally(invitations, 'status', 'CREATED') +
-        tally(invitations, 'status', 'SENT') +
-        tally(invitations, 'status', 'OPENED'),
+      total: n('inv_total'),
+      accepted: n('inv_accepted'),
+      completed: n('inv_completed'),
+      outstanding: n('inv_outstanding'),
     },
     artists: {
-      total: sum(artists),
-      approved: tally(artists, 'approved', true),
-      awaiting: tally(artists, 'approved', false),
+      total: n('artists_total'),
+      approved: n('artists_approved'),
+      awaiting: n('artists_awaiting'),
     },
-    artwork: Object.fromEntries(
-      artworkByStatus.map((row) => [row.status, row._count]),
-    ) as Record<string, number>,
+    artwork: {
+      DRAFT: n('art_draft'),
+      SUBMITTED: n('art_submitted'),
+      UNDER_REVIEW: n('art_under_review'),
+      RETURNED_FOR_INFORMATION: n('art_returned'),
+      APPROVED: n('art_approved'),
+      PUBLISHED: n('art_published'),
+      REJECTED: n('art_rejected'),
+    } as Record<string, number>,
     evidence: {
-      records: evidence,
-      openGaps,
-      unresolvedContradictions: contradictions,
-      escalationsOutstanding: escalations,
+      records: n('evidence_records'),
+      openGaps: n('gaps_open'),
+      unresolvedContradictions: n('contradictions_open'),
+      escalationsOutstanding: n('escalations_open'),
     },
     cases: {
-      total: sum(casesByStatus),
-      byStatus: Object.fromEntries(
-        casesByStatus.map((row) => [row.status, row._count]),
-      ) as Record<string, number>,
-      issuedVersions,
+      total: n('cases_total'),
+      issued: n('cases_issued'),
+      issuedVersions: n('versions_issued'),
     },
   };
 }
