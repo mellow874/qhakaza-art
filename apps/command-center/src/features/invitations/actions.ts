@@ -52,16 +52,24 @@ export type InvitationResult<T = undefined> =
  * meaningless to the recipient - and a half-copied one is worse than useless:
  * pasting `private/abc...` into a browser searches the web for it.
  *
- * The localhost fallbacks are development conveniences. If they survive into a
- * deployed Command Center the links will only work on the machine that made
- * them, so the panel says so in red when it sees one.
+ * TWO NAMES FOR EACH, CHECKED IN ORDER. `COLLECTOR_URL` and `VERA_URL` are
+ * read first and are server-only, which is the right shape for a value the
+ * browser never needs. The `NEXT_PUBLIC_` versions are the fallback because
+ * they already exist for the collector footer's cross-site link.
+ *
+ * The localhost defaults are for development. A deployed Command Center that
+ * still falls back to them produces links that open on one machine and nowhere
+ * else, so the admin panel says so in red when it sees one.
  */
 function invitationUrl(typeSlug: string, token: string): string {
-  const collectorBase = (process.env.NEXT_PUBLIC_COLLECTOR_URL || 'http://localhost:3002').replace(
-    /\/+$/,
-    '',
-  );
-  const veraBase = (process.env.NEXT_PUBLIC_VERA_URL || 'http://localhost:3001').replace(/\/+$/, '');
+  const base = (...candidates: (string | undefined)[]) =>
+    (candidates.find((value) => value?.trim()) ?? '').trim().replace(/\/+$/, '');
+
+  const collectorBase =
+    base(process.env.COLLECTOR_URL, process.env.NEXT_PUBLIC_COLLECTOR_URL) ||
+    'http://localhost:3002';
+  const veraBase =
+    base(process.env.VERA_URL, process.env.NEXT_PUBLIC_VERA_URL) || 'http://localhost:3001';
 
   return typeSlug.toUpperCase() === 'ARTIST'
     ? `${veraBase}/invitation/${token}`
