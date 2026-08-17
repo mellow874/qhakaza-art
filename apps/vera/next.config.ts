@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? '.next',
 
   /* The shared packages ship TypeScript source, so each app compiles them. */
-  transpilePackages: ['@qhakaza/shared-db', '@qhakaza/shared-auth', '@qhakaza/shared-ui', '@qhakaza/shared-email', '@qhakaza/shared-storage'],
+  transpilePackages: ['@qhakaza/shared-db', '@qhakaza/shared-auth', '@qhakaza/shared-ui', '@qhakaza/shared-storage'],
 
   images: {
     // `picsum.photos` is used only by the development seed; real uploads land

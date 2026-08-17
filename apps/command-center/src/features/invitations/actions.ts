@@ -45,12 +45,23 @@ export type InvitationResult<T = undefined> =
   | ({ ok: true } & (T extends undefined ? object : T))
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
-/** Where an invitation link points, by recipient type. */
+/**
+ * Where an invitation link points, by recipient type.
+ *
+ * ALWAYS ABSOLUTE. Each site is its own deployment, so a path alone would be
+ * meaningless to the recipient - and a half-copied one is worse than useless:
+ * pasting `private/abc...` into a browser searches the web for it.
+ *
+ * The localhost fallbacks are development conveniences. If they survive into a
+ * deployed Command Center the links will only work on the machine that made
+ * them, so the panel says so in red when it sees one.
+ */
 function invitationUrl(typeSlug: string, token: string): string {
-  // Each site is its own deployment, so these are absolute. The fallbacks are
-  // the development ports; production sets both variables.
-  const collectorBase = process.env.NEXT_PUBLIC_COLLECTOR_URL ?? 'http://localhost:3002';
-  const veraBase = process.env.NEXT_PUBLIC_VERA_URL ?? 'http://localhost:3001';
+  const collectorBase = (process.env.NEXT_PUBLIC_COLLECTOR_URL || 'http://localhost:3002').replace(
+    /\/+$/,
+    '',
+  );
+  const veraBase = (process.env.NEXT_PUBLIC_VERA_URL || 'http://localhost:3001').replace(/\/+$/, '');
 
   return typeSlug.toUpperCase() === 'ARTIST'
     ? `${veraBase}/invitation/${token}`

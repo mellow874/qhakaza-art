@@ -28,8 +28,19 @@ const LIVE = ['CREATED', 'SENT', 'OPENED'] as const;
 export type InvitationLookup = {
   id: string;
   email: string;
+  recipientName: string | null;
   status: string;
   expiresAt: Date;
+  /**
+   * Decided here, not by the caller.
+   *
+   * A page that computed this would be calling Date.now() during render, which
+   * is both impure and a lint error - and more importantly it would let two
+   * screens disagree about whether the same invitation had expired.
+   */
+  isExpired: boolean;
+  /** Cancelled under either the current or the original spelling. */
+  isCancelled: boolean;
   recipientTypeSlug: string | null;
   grantsRole: string | null;
   acceptedByUserId: string | null;
@@ -43,6 +54,7 @@ export async function findInvitationByToken(token: string): Promise<InvitationLo
       select: {
         id: true,
         email: true,
+        recipientName: true,
         status: true,
         expiresAt: true,
         acceptedByUserId: true,
@@ -56,8 +68,11 @@ export async function findInvitationByToken(token: string): Promise<InvitationLo
   return {
     id: found.id,
     email: found.email,
+    recipientName: found.recipientName,
     status: found.status,
     expiresAt: found.expiresAt,
+    isExpired: found.expiresAt.getTime() <= Date.now(),
+    isCancelled: found.status === 'CANCELLED' || found.status === 'REVOKED',
     acceptedByUserId: found.acceptedByUserId,
     recipientTypeSlug: found.recipientType?.slug ?? null,
     grantsRole: found.recipientType?.grantsRole ?? null,

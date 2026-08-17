@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 
 import { invitationInputSchema } from '@/lib/validation/invitation';
 
@@ -20,6 +20,55 @@ import { cancelInvitation, createInvitation, resendInvitation } from './actions'
  *     retrieved later. The panel keeps it on screen until dismissed and says
  *     plainly that it will not be shown again.
  */
+
+/**
+ * Where the one-time link is kept so a re-render cannot lose it.
+ *
+ * Creating an invitation calls revalidatePath, which re-renders this page - and
+ * the one thing that must NOT be lost in that re-render is the only copy of a
+ * link that cannot be retrieved again. It was vanishing before anyone had a
+ * chance to read it.
+ *
+ * Read through useSyncExternalStore rather than an effect. sessionStorage is
+ * exactly the "external system" that API exists for: it gives a server snapshot
+ * (nothing) and a client snapshot (whatever is stored) without a setState in an
+ * effect body, and without the hydration mismatch a lazy initialiser would
+ * cause by reading browser storage during render.
+ */
+const ISSUED_KEY = 'qhakaza.invitation.issued';
+const ISSUED_EVENT = 'qhakaza:invitation-issued';
+
+type IssuedLink = { link: string; emailed: boolean };
+
+function subscribeToIssued(onChange: () => void) {
+  window.addEventListener(ISSUED_EVENT, onChange);
+  // `storage` covers the same console open in a second tab.
+  window.addEventListener('storage', onChange);
+  return () => {
+    window.removeEventListener(ISSUED_EVENT, onChange);
+    window.removeEventListener('storage', onChange);
+  };
+}
+
+/** The raw string, so the snapshot is referentially stable between renders. */
+function readIssued(): string | null {
+  try {
+    return sessionStorage.getItem(ISSUED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeIssued(value: IssuedLink | null) {
+  try {
+    if (value) sessionStorage.setItem(ISSUED_KEY, JSON.stringify(value));
+    else sessionStorage.removeItem(ISSUED_KEY);
+  } catch {
+    // Private browsing can refuse storage. The link still shows for this
+    // render; only surviving a refresh is lost.
+  }
+  window.dispatchEvent(new Event(ISSUED_EVENT));
+}
 
 type RecipientType = { id: string; slug: string; label: string };
 
@@ -76,7 +125,33 @@ export function InvitationPanel({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [issued, setIssued] = useState<{ link: string; emailed: boolean } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const storedIssued = useSyncExternalStore(subscribeToIssued, readIssued, () => null);
+  const issued = useMemo<IssuedLink | null>(() => {
+    if (!storedIssued) return null;
+    try {
+      return JSON.parse(storedIssued) as IssuedLink;
+    } catch {
+      return null;
+    }
+  }, [storedIssued]);
+
+  function remember(value: IssuedLink | null) {
+    setCopied(false);
+    writeIssued(value);
+  }
+
+  async function copyLink(link: string) {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+    } catch {
+      // Clipboard access can be refused. The input below is selectable, and
+      // selecting all of it is what the button is really for.
+      setCopied(false);
+    }
+  }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -103,7 +178,7 @@ export function InvitationPanel({
       const result = await createInvitation(parsed.data);
 
       if (result.ok) {
-        setIssued({ link: result.link, emailed: result.emailed });
+        remember({ link: result.link, emailed: result.emailed });
         setName('');
         setEmail('');
       } else if (result.error === 'ALREADY_INVITED') {
@@ -189,18 +264,53 @@ export function InvitationPanel({
       {issued && (
         <div role="status" className="border-accent bg-accent/5 flex flex-col gap-3 border p-5">
           <p className="text-heading text-sm">
-            Invitation created{issued.emailed && emailConfigured ? ' and emailed' : ''}.
+            Invitation created{issued.emailed && emailConfigured ? ' and emailed' : ''}. Copy the
+            link below and send it to them.
           </p>
           <p className="text-muted text-xs leading-relaxed">
-            This link is shown once. Only a fingerprint of it is stored, so it cannot be shown
-            again — if it is lost, issue a new invitation.
+            Shown once. Only a fingerprint of it is stored, so it cannot be shown again — if it is
+            lost, reissue the invitation. It stays here until you dismiss it.
           </p>
-          <code className="bg-canvas border-line overflow-x-auto border p-3 text-xs break-all">
-            {issued.link}
-          </code>
+
+          {/*
+            A read-only input rather than a <code> block. Selecting a wrapped
+            code block by hand is how someone ends up pasting half a URL into
+            the address bar, which is exactly what happened. `select()` on focus
+            takes the whole thing, and the button copies it outright.
+          */}
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              readOnly
+              value={issued.link}
+              onFocus={(event) => event.currentTarget.select()}
+              onClick={(event) => event.currentTarget.select()}
+              aria-label="Invitation link"
+              className="border-line bg-canvas text-heading min-w-0 flex-1 border p-3 font-mono text-xs"
+            />
+            <button
+              type="button"
+              onClick={() => copyLink(issued.link)}
+              className="border-accent text-accent caps hover:bg-accent/10 border px-4 py-3 text-xs"
+            >
+              {copied ? 'Copied' : 'Copy link'}
+            </button>
+          </div>
+
+          {/*
+            A localhost link works on this machine and nowhere else. Said here
+            rather than left to be discovered by sending one to a collector.
+          */}
+          {issued.link.includes('localhost') && (
+            <p className="text-danger text-xs leading-relaxed">
+              This link points at <strong>localhost</strong>, so it will only open on this
+              computer. Set NEXT_PUBLIC_COLLECTOR_URL (and NEXT_PUBLIC_VERA_URL for artists) on
+              the Command Center before sending invitations to anyone else.
+            </p>
+          )}
+
           <button
             type="button"
-            onClick={() => setIssued(null)}
+            onClick={() => remember(null)}
             className="text-muted hover:text-heading caps self-start text-xs"
           >
             Dismiss
@@ -259,7 +369,7 @@ export function InvitationPanel({
                           would hand out a second route to an existing account. */}
                       {!settled && (
                         <span className="flex gap-3">
-                          <ReissueButton id={invitation.id} onLink={setIssued} />
+                          <ReissueButton id={invitation.id} onLink={remember} />
                           <CancelButton id={invitation.id} />
                         </span>
                       )}
