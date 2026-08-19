@@ -53,30 +53,6 @@ Private Notes, Analytics, Access & permissions, Audit trail.
 That order is a **sensible default, pending founder input** — it puts the work
 queues first and the reference material last. Reordering is moving JSX blocks.
 
-### B9 - Four tables have no RLS at all
-
-Surfaced by the Phase 1 schema snapshot (`docs/SCHEMA-SNAPSHOT.md`), which
-reports RLS state per table rather than assuming it.
-
-Eight tables have row-level security disabled. Four are expected - NextAuth's
-`Account`, `Session`, `VerificationToken`, and `_prisma_migrations`. The other
-four are not:
-
-- **`User`** - the application role can read every row, including email
-  addresses and bcrypt password hashes. Auth needs to look users up by email,
-  so this needs a considered policy rather than a blanket one, but "no policy"
-  is not the right answer.
-- **`ContactMessage`** - written by the public contact form and the collector
-  private-request form. Readable by anyone the app role can serve.
-- **`Order`, `Favorite`** - legacy marketplace tables, retained but unprotected.
-
-Not fixed here: Phase 1 is migration readiness, and changing policies mid-audit
-would invalidate the snapshot it just produced. Belongs to section 22, where
-every table gets an `RLS_MATRIX` entry. Raised now because it is a live gap in
-production, not a future one.
-
----
-
 ### B7 — No privacy policy or terms of service
 
 Vera's footer has linked to `/privacy` and `/terms` since the design was
@@ -174,6 +150,34 @@ panels are honestly empty rather than showing invented figures.
 ---
 
 ## Closed
+
+### C10 - Eight tables were readable through Supabase's public API - **fixed**
+
+Was B9, raised during the Phase 1 audit and scheduled for the section 22 sweep.
+Supabase's own scanner raised it first, which is fair: a live exposure should
+not have waited for a later phase.
+
+Supabase publishes every table in `public` through a REST API authenticated
+with the `anon` key, which is meant to be public. RLS is the only thing between
+that API and a table, and eight had it switched off - including `User` (email
+addresses and bcrypt hashes), `Session` (session tokens), and `ContactMessage`.
+
+Fixed by enabling RLS on all eight and adding policies scoped `TO qhakaza_app`.
+
+That scoping is the point, and it differs from every other policy here. The
+rest decide on `current_setting('qhakaza.role')` and apply to all roles, which
+works because the API never sets that variable and so evaluates as 'public'.
+It would NOT work for these: signing in looks a user up before anyone is
+authenticated, so a GUC-based policy would have to permit 'public' - and the
+API would pass the same test. Naming the role excludes the API outright.
+
+Verified: zero policies on those tables are reachable by the `anon` role, and
+the application's own reads - including the sign-in lookup - are unchanged.
+
+Note for whoever reads this next: the `service_role` key bypasses RLS by
+design. It is a secret, lives only in server-side environment variables, and
+must never carry a NEXT_PUBLIC_ prefix.
+
 
 ### C1 — Three collector CTAs all led to `/collectors/apply` — **fixed**
 
