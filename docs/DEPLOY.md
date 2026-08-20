@@ -75,7 +75,7 @@ unreadable by the others.
 
 | Project        | `AUTH_URL`                       |
 | -------------- | -------------------------------- |
-| Vera           | `https://qhakaza.art`            |
+| The Artist Intelligence Platform           | `https://qhakaza.art`            |
 | Collector      | `https://collectors.qhakaza.art` |
 | Command Center | `https://ops.qhakaza.art`        |
 
@@ -86,7 +86,7 @@ Optional, where used: `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (redirect URI
 >
 > If you point it at the owner, every RLS policy is silently bypassed and the
 > apps regain full access to every table — including collector intakes from
-> Vera. It will look like it works. That is exactly the danger.
+> the Artist Intelligence Platform. It will look like it works. That is exactly the danger.
 >
 > Sanity check after the first deploy: the app connection should report
 > `superuser: false, bypassrls: false`.
@@ -184,14 +184,14 @@ is transaction-local, which is precisely why it was written that way.
 
 | Project        | Suggested domain                           |
 | -------------- | ------------------------------------------ |
-| Vera           | `qhakaza.art` — the public, indexable site |
+| The Artist Intelligence Platform           | `qhakaza.art` — the public, indexable site |
 | Collector      | `collectors.qhakaza.art`                   |
 | Command Center | `ops.qhakaza.art`                          |
 
-Nothing links Vera to the collector site, so the domains can be entirely
+Nothing links the Artist Intelligence Platform to the collector site, so the domains can be entirely
 unrelated if you would rather they were not visibly connected.
 
-`robots.ts` in each app already reflects this: Vera is indexable, the collector
+`robots.ts` in each app already reflects this: the Artist Intelligence Platform is indexable, the collector
 shell is indexable but `/private/` is disallowed, and the Command Center
 disallows everything.
 

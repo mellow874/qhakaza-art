@@ -185,7 +185,7 @@ Then by hand:
 ### 9 — Cut over
 
 1. Update `DATABASE_URL` and `DIRECT_DATABASE_URL` in **all three** Vercel
-   projects (Vera, Collector Platform, Command Center).
+   projects (the Artist Intelligence Platform, Collector Platform, Command Center).
 2. Redeploy all three.
 3. Re-run the manual checks in step 8 against the deployed sites.
 4. **Leave the old database running, untouched, for at least 14 days.**

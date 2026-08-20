@@ -52,10 +52,16 @@ export type InvitationResult<T = undefined> =
  * meaningless to the recipient - and a half-copied one is worse than useless:
  * pasting `private/abc...` into a browser searches the web for it.
  *
- * TWO NAMES FOR EACH, CHECKED IN ORDER. `COLLECTOR_URL` and `VERA_URL` are
- * read first and are server-only, which is the right shape for a value the
- * browser never needs. The `NEXT_PUBLIC_` versions are the fallback because
- * they already exist for the collector footer's cross-site link.
+ * NAMES CHECKED IN ORDER, NEWEST FIRST.
+ *
+ * `ARTIST_PLATFORM_URL` replaces `VERA_URL`. The artist environment is the
+ * Qhakaza Artist Intelligence Platform; VERA now means only the evidence and
+ * decision layer, and one name for two systems was a collision waiting to
+ * mislead someone.
+ *
+ * The old names are still read, deliberately. They are set in three Vercel
+ * projects, and a rename that silently produced localhost invitation links
+ * would be a poor trade for tidiness. Remove them once Vercel is updated.
  *
  * The localhost defaults are for development. A deployed Command Center that
  * still falls back to them produces links that open on one machine and nowhere
@@ -68,11 +74,17 @@ function invitationUrl(typeSlug: string, token: string): string {
   const collectorBase =
     base(process.env.COLLECTOR_URL, process.env.NEXT_PUBLIC_COLLECTOR_URL) ||
     'http://localhost:3002';
-  const veraBase =
-    base(process.env.VERA_URL, process.env.NEXT_PUBLIC_VERA_URL) || 'http://localhost:3001';
+  const artistBase =
+    base(
+      process.env.ARTIST_PLATFORM_URL,
+      process.env.NEXT_PUBLIC_ARTIST_PLATFORM_URL,
+      // Deprecated, still honoured so existing deployments keep working.
+      process.env.VERA_URL,
+      process.env.NEXT_PUBLIC_VERA_URL,
+    ) || 'http://localhost:3001';
 
   return typeSlug.toUpperCase() === 'ARTIST'
-    ? `${veraBase}/invitation/${token}`
+    ? `${artistBase}/invitation/${token}`
     : `${collectorBase}/private/${token}`;
 }
 

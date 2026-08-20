@@ -11,23 +11,18 @@ export const brand = {
   suite: 'Collector Intelligence Suite',
 };
 
-/**
- * Vera — the artist website. A different application on a different domain, so
- * it cannot be reached with a path.
+/*
+ * There is deliberately NO link from here into the artist platform.
  *
- * `NEXT_PUBLIC_` because the footer is rendered on the client too, so the value
- * is inlined at build time.
+ * A collector must never need to enter the artist operating environment. The
+ * two read the same underlying records but are separate experiences, and the
+ * artist intelligence a member may see is delivered inside this platform
+ * rather than by sending them elsewhere.
  *
- * THE VARIABLE IS OPTIONAL. The fallback below is Vera's live address, so this
- * link is correct in production whether or not anything is configured. That
- * matters because Vercel warns when you add a NEXT_PUBLIC_ variable - rightly,
- * since the prefix publishes the value to the browser - and there is no reason
- * to accept that warning for a value that is already right.
- *
- * A public website address is not a secret; it appears in the page's own HTML.
- * But the setting that does not need to exist is the one that cannot be wrong.
+ * The `VERA_URL` export that used to live here has been removed. It carried
+ * the old naming collision too: "Vera" is the artist platform's former name,
+ * while VERA now means only the evidence and decision layer.
  */
-export const VERA_URL = process.env.NEXT_PUBLIC_VERA_URL ?? 'https://qhakaza-art-vera.vercel.app/';
 
 /**
  * The navigation labels are the design's. The destinations are the pages that
@@ -177,8 +172,10 @@ export const footer = {
     {
       heading: 'Suite',
       links: [
-        // The artist site itself, not the preview of its records on this page.
-        { href: VERA_URL, label: 'Artist Intelligence' },
+        // Stays on this site. Artist intelligence is delivered to a member
+        // inside the collector platform, never by sending them across to the
+        // artist environment.
+        { href: '/collectors#intelligence-preview', label: 'Artist Intelligence' },
         { href: '/collectors#intelligence-preview', label: 'Artwork Intelligence' },
         { href: '/collectors#what-you-receive', label: 'Intelligence' },
         { href: '/collectors/request', label: 'Request Access' },
@@ -191,7 +188,7 @@ export const footer = {
         { href: '/collectors', label: 'Collector Intelligence' },
         { href: '/collectors#featured-experience', label: 'Private Experiences' },
         // "Artists" is deliberately absent. It pointed at `/artists`, which is
-        // a Vera route and 404s here — and the artists a member may see are
+        // an artist-platform route and 404s here — and the artists a member sees are
         // behind `/private`, so there is nothing public to link to.
         { href: '/collectors/methodology', label: 'Methodology' },
       ],

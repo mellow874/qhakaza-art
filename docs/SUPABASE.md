@@ -112,7 +112,7 @@ URI is `<AUTH_URL>/api/auth/callback/google`.
 
 `postgres` owns every table **and bypasses Row-Level Security**. If
 `DATABASE_URL` points at it, every policy is silently ignored and the apps get
-full access to everything — Vera could read collector intakes.
+full access to everything — the Artist Intelligence Platform could read collector intakes.
 
 It will look like it works. That is what makes it dangerous.
 

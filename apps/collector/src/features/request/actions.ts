@@ -10,7 +10,8 @@ export type PrivateRequestResult =
 /**
  * Submits a private collector enquiry.
  *
- * Stores to ContactMessage table (same as Vera's contact form). The row is the
+ * Stores to ContactMessage table (same as the artist platform's contact form).
+ * The row is the
  * durable record — there is no mail provider configured, so a form that quietly
  * drops requests would be worse than no form at all.
  *

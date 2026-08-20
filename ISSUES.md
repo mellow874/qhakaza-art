@@ -55,7 +55,7 @@ queues first and the reference material last. Reordering is moving JSX blocks.
 
 ### B7 — No privacy policy or terms of service
 
-Vera's footer has linked to `/privacy` and `/terms` since the design was
+The Artist Intelligence Platform's footer has linked to `/privacy` and `/terms` since the design was
 transcribed. Neither route existed, so both 404'd from every page on the site —
 caught by the new `links.spec.ts`, not by any earlier test.
 
@@ -126,9 +126,9 @@ The supplied files are named `photo-1(1).png`, `photo-3.jpg` and so on. They
 work, but the parentheses and the `(1)` suffix should be renamed to something
 descriptive before launch.
 
-### I9 — Vera has no sitemap or robots.txt
+### I9 — the Artist Intelligence Platform has no sitemap or robots.txt
 
-The collector app serves both; Vera serves neither. Vera is the public-facing
+The collector app serves both; the Artist Intelligence Platform serves neither. The Artist Intelligence Platform is the public-facing
 marketing site of the two, so it is the one that wants them more. Not a bug —
 nothing is broken — but it should exist before launch.
 
@@ -201,7 +201,7 @@ pooled connection and failing with `P2028`. Now one transaction for the page.
 
 ### C5 — Sign-up asked "I am joining as" — **fixed**
 
-Was I1. Resolved as option (a): the role selector is gone. Vera's sign-up makes
+Was I1. Resolved as option (a): the role selector is gone. The Artist Intelligence Platform's sign-up makes
 artists and nothing else, the Collector Platform has its own sign-up that makes
 collectors, and each fixes the role server-side. A crafted request naming
 another role is ignored — tested on both sites.
@@ -226,7 +226,7 @@ configured.
 Was I5. `/briefings/<slug>` now exists and is prerendered from the content list.
 The article bodies were never supplied, so the page shows the excerpt we have
 and says the full text is being prepared rather than inventing market claims.
-`links.spec.ts` on Vera now walks every internal link and opens every briefing,
+`links.spec.ts` on the Artist Intelligence Platform now walks every internal link and opens every briefing,
 so this class of bug fails the build instead of shipping.
 
 ### C9 — Two competing "Request Access" flows — **fixed**

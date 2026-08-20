@@ -137,7 +137,7 @@ Palette, type and layout rules: [docs/DESIGN.md](docs/DESIGN.md).
 ## Architecture
 
 **Mid-split.** The app is being separated into three independently deployable
-apps over one shared database. Vera is extracted (Phase 2); the collector and
+apps over one shared database. The Artist Intelligence Platform is extracted (Phase 2); the collector and
 admin apps follow in Phases 3 and 4, and the root app is deleted in Phase 6.
 
 ```
@@ -193,9 +193,9 @@ layout, navigation and access rules in their own tree.
 
 | Command                  | Does                                    |
 | ------------------------ | --------------------------------------- |
-| `npm run vera`           | Vera dev server on :3001                |
+| `npm run vera`           | Artist platform dev server on :3001                |
 | `npm run dev`            | The not-yet-extracted app on :3000      |
-| `npm run test:workspace` | Unit + integration across root and Vera |
+| `npm run test:workspace` | Unit + integration across root and the artist platform |
 | `npm run e2e:workspace`  | Both Playwright suites                  |
 
 Each app can also be driven directly: `npm test --workspace @qhakaza/vera`.

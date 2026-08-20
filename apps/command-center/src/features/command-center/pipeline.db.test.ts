@@ -17,7 +17,7 @@ const { getCommunications } = await import('./queries');
 /**
  * The pipeline the Command Center exists to carry:
  *
- *   artist submits in Vera
+ *   artist submits on the artist platform
  *     -> admin verifies and releases here
  *       -> invited collector sees it in the Collector Platform
  *         -> their enquiry comes back here, attached to the artist's work

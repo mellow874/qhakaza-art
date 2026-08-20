@@ -12,9 +12,11 @@ export type SignUpResult =
 /**
  * Creates a **collector** account.
  *
- * The Collector Platform's own sign-up, added when Vera's became artist-only.
+ * The Collector Platform's own sign-up, added when the artist platform's
+ * became artist-only.
  * A collector needs an account *before* they can open an invitation to
- * `/private/<token>`, so removing the choice from Vera without putting a door
+ * `/private/<token>`, so removing the choice from the artist platform without
+ * putting a door
  * here would have left invitees with no way in.
  *
  * An account is not access. It grants nothing on its own — the private area

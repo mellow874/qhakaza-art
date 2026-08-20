@@ -38,6 +38,20 @@ export default defineConfig({
     tsconfigPaths: true,
   },
   test: {
+  /*
+   * THREADS, NOT FORKS.
+   *
+   * The default `forks` pool starts a new process per worker. Spinning up jsdom
+   * that way costs about a minute on a loaded machine, and when the unit and
+   * integration projects run together the jsdom workers were timing out during
+   * startup - after which vitest reported only the project that finished and
+   * still exited 0.
+   *
+   * That is the dangerous part: `npm test` was quietly reporting 42 tests when
+   * there are 77, and a genuine failure could have hidden the same way. Threads
+   * share the process and start fast enough that both projects complete.
+   */
+  pool: 'threads',
     coverage: {
       provider: 'v8',
       include: ['src/**/*.{ts,tsx}', 'packages/*/src/**/*.{ts,tsx}'],
