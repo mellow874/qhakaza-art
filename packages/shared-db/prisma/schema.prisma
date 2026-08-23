@@ -291,8 +291,14 @@ model Artwork {
   reviewRequests ArtworkReviewRequest[]
   orders         Order[]
 
+  /// What the work is about, for matching against collector preferences.
+  /// Free text rather than a fixed vocabulary: Qhakaza's language for its own
+  /// artists is not a list a developer should be inventing.
+  themes String[]
+
   // Visibility and release
   releases    ArtworkRelease[]
+  suggestions MatchSuggestion[]
   permissions ArtistPermission[]
 
   // VERA
@@ -411,6 +417,8 @@ model Membership {
   invitations MemberInvitation[]
   notes       PrivateNoteSubmission[]
   audiences   AudienceMember[]
+  profile     CollectorProfile?
+  suggestions MatchSuggestion[]
 
   @@index([status])
   @@index([userId])
@@ -2081,5 +2089,91 @@ model ArtistPermission {
 
   @@unique([artistId, artworkId, kind])
   @@index([artworkId, kind, granted])
+  @@index([createdById])
+}
+
+// ===========================================================================
+// COLLECTOR PROFILE AND MATCHING
+//
+// Qhakaza matches approved work to collectors by genre and collecting
+// preference. Those preferences already existed - scattered across the intake
+// form and the Private Note, keyed by email, attached to no one. This gives
+// them a home against the membership so they can be used.
+//
+// THE SYSTEM SUGGESTS. IT NEVER RELEASES. Nothing here creates an
+// ArtworkRelease; suggestions are ranked candidates for an admin to accept or
+// ignore, and the release remains a deliberate human act.
+// ===========================================================================
+
+/// A collector's private record of preference and relationship intelligence.
+///
+/// One per membership. Populated from the intake and the Private Note today,
+/// and from the conversational agent when it replaces the form; extended into
+/// the fuller Collecting Direction in the collector-platform phase.
+model CollectorProfile {
+  id           String @id @default(cuid())
+  membershipId String @unique
+
+  /// What they collect. The matchable fields.
+  mediums String[]
+  regions String[]
+  themes  String[]
+
+  /// How they collect. Read by a person, not by the ranker.
+  motivations      String?
+  budgetLogic      String?
+  acquisitionPace  String?
+  collectingIntent String?
+  /// How settled they are in their own judgement, in Qhakaza's words.
+  confidenceLevel  String?
+  confidenceGaps   String?
+
+  /// Where this understanding came from: "intake", "private-note",
+  /// "conversation", "advisor". Free text because the list will grow.
+  sourcedFrom String?
+  /// Anything an advisor wants remembered that has no field of its own.
+  notes       String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([createdById])
+}
+
+/// A ranked suggestion an admin has been shown.
+///
+/// Recorded rather than computed and forgotten, for two reasons: an admin
+/// should see what was already suggested and dismissed, and knowing which
+/// suggestions were acted on is the only way to tell whether the ranking is
+/// any good.
+model MatchSuggestion {
+  id           String @id @default(cuid())
+  artworkId    String
+  membershipId String
+
+  /// Higher is a closer fit. Ordering only - never shown as a percentage,
+  /// because it is not a measurement of anything.
+  score     Int     @default(0)
+  /// Why this pairing surfaced, in words an advisor can weigh.
+  rationale String?
+
+  /// Set when an admin acts on it. A suggestion is never a release.
+  actedOn   Boolean   @default(false)
+  dismissed Boolean   @default(false)
+  decidedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artwork    Artwork    @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([artworkId, membershipId])
+  @@index([membershipId, score])
+  @@index([artworkId, score])
   @@index([createdById])
 }

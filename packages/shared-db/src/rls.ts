@@ -530,6 +530,29 @@ export const RLS_MATRIX = {
     update: { admin: true, advisor: true },
     delete: {},
   },
+  CollectorProfile: {
+    /*
+     * Staff only, and NOT the collector themselves.
+     *
+     * This is Qhakaza's reading of a person - confidence gaps, budget logic,
+     * what an advisor wants remembered. A collector seeing the file kept on
+     * them would change what they say in the Private Note, which is the one
+     * thing that must stay candid. Section 6's collector-facing Collecting
+     * Direction is a separate, deliberately curated projection.
+     */
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, system: true },
+    update: { admin: true, advisor: true, system: true },
+    delete: {},
+  },
+  MatchSuggestion: {
+    // Internal working material. A collector must never learn they were
+    // considered for a work and passed over.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
   MediaAsset: {
     // Artists write their own uploads and read them back. Staff see everything.
     // Collectors are NOT granted a read: released artwork images are served

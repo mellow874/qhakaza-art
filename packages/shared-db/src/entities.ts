@@ -64,6 +64,10 @@ export const CORE_ENTITIES = [
   'AudienceMember',
   'ArtworkRelease',
   'ArtistPermission',
+
+  // Profile and matching
+  'CollectorProfile',
+  'MatchSuggestion',
   'Artist',
   'Artwork',
   'NewsArticle',
@@ -149,6 +153,11 @@ export const ENTITY_DOMAIN = {
   AudienceMember: 'platform',
   ArtworkRelease: 'platform',
   ArtistPermission: 'platform',
+
+  // A collector's own record of preference, and the suggestions drawn from
+  // it. Both are Qhakaza's working material about a person.
+  CollectorProfile: 'collector',
+  MatchSuggestion: 'collector',
   ActivationAttempt: 'collector',
   PrivateNoteSubmission: 'collector',
 

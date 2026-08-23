@@ -149,6 +149,31 @@ panels are honestly empty rather than showing invented figures.
 
 ---
 
+### B10 - Which audience types are live products, and which are placeholders
+
+Phase 3 created eight audience types. Five are real today - one collector,
+selected collectors, a segment, the wider approved membership, and public
+editorial. Three exist so a work can be released to them but have no product
+behind them yet: private brief, partner programme, private experience.
+
+They carry `isLiveProduct = false` so nobody mistakes a placeholder for a
+finished feature, and the brief lists their full versions as a later phase.
+
+Needs: confirmation that the split is right, and Qhakaza's own names for them
+if these are not the words used internally.
+
+### B11 - Matching weights are a starting point, not a finding
+
+Medium counts 3, theme 2, region 1. That ordering says a collector naming a
+medium is stating something firmer than one naming a region, which is a guess
+about how Qhakaza reads its own collectors.
+
+The ranking is deliberately legible so it can be argued with: every suggestion
+carries the sentence explaining it. Needs Qhakaza's view once real suggestions
+have been looked at.
+
+---
+
 ## Closed
 
 ### C10 - Eight tables were readable through Supabase's public API - **fixed**

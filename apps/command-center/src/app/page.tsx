@@ -6,6 +6,14 @@ import { requireRole } from '@qhakaza/shared-auth/guards';
 import { auth } from '@qhakaza/shared-auth/server';
 
 import { AdminCommandCenter } from '@/components/AdminCommandCenter';
+import {
+  createAudience,
+  releaseArtwork,
+  revokeRelease,
+  suggestCollectorsFor,
+} from '@/features/audiences/actions';
+import { getPlacementData } from '@/features/audiences/queries';
+import { PlacementPanel } from '@/features/audiences/placement-panel';
 import { getCommandCentreData } from '@/features/command-center/queries';
 import { getEmailStatus } from '@/features/invitations/actions';
 
@@ -39,7 +47,7 @@ export default async function CommandCenterPage() {
 
   // One call, one transaction, one declared actor. See queries.ts for why this
   // is deliberately not seven parallel reads.
-  const data = await getCommandCentreData(actor);
+  const [data, placement] = await Promise.all([getCommandCentreData(actor), getPlacementData()]);
   const email = await getEmailStatus();
 
   return (
