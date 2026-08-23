@@ -92,7 +92,18 @@ export async function setArtworkRelease(input: {
   // members through the back door. The gate is here, not only in the query.
   if (input.release && !artwork.artist.approved) return { ok: false, error: 'INVALID' };
 
-  const next = input.release ? 'PUBLISHED' : 'HIDDEN';
+  /*
+   * RELEASING NO LONGER MEANS PUBLISHING.
+   *
+   * This action predates the visibility model. It used to flip a work to
+   * PUBLISHED, which simultaneously put it on the public site and in every
+   * collector's private area - the defect the visibility phase removes.
+   *
+   * It now moves a work to COLLECTOR_READY: vetted and prepared, visible to
+   * nobody until an ArtworkRelease places it with an audience. Withdrawing
+   * archives it. Deciding WHO sees a work is a separate, deliberate act.
+   */
+  const next = input.release ? 'COLLECTOR_READY' : 'ARCHIVED';
 
   try {
     await performAudited({

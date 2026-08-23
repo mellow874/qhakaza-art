@@ -1,4 +1,7 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
+
+import { auth } from '@qhakaza/shared-auth/server';
 
 import { getReleasedArtworks } from '@/features/private/queries';
 
@@ -13,19 +16,33 @@ function money(amount: { toString(): string }, currency: string) {
 
 export default async function DiscoverPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const artworks = await getReleasedArtworks();
+
+  /*
+   * Scoped to THIS collector, not to "members".
+   *
+   * There is no longer a query for what collectors in general can see - only
+   * what a named one can. The layout has already established the session; this
+   * refuses rather than guessing if it somehow has not.
+   */
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) notFound();
+
+  const artworks = await getReleasedArtworks({ userId });
 
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-20">
       <p className="eyebrow">Discovery</p>
-      <h1 className="mt-6 text-4xl sm:text-5xl">Works released to members</h1>
+      <h1 className="mt-6 text-4xl sm:text-5xl">Selected for you</h1>
       <p className="text-body mt-6 max-w-2xl leading-relaxed">
-        Each work below is by an approved artist and has been released for member viewing.
+        Work Qhakaza has chosen to place in front of you. This is not a catalogue, and it is not
+        what every member sees.
       </p>
 
       {artworks.length === 0 ? (
         <p className="text-muted mt-12">
-          Nothing has been released yet. This page fills as the Command Center prepares records.
+          Nothing has been placed with you yet. Qhakaza selects work for each collector
+          individually, so this fills as your advisor prepares it.
         </p>
       ) : (
         <ul className="bg-line/70 mt-12 grid gap-px sm:grid-cols-2 lg:grid-cols-3">

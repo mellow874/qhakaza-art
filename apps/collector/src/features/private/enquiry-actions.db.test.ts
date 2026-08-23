@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { fingerprintToken } from '@qhakaza/shared-auth/guards';
-import { prisma } from '@qhakaza/shared-db';
+import { prisma, releaseToCollectors } from '@qhakaza/shared-db';
 
 // The action reads the session; each test decides who is asking.
 const auth = vi.hoisted(() => vi.fn());
@@ -12,10 +12,25 @@ const { submitEnquiry } = await import('./enquiry-actions');
 const HOUR = 60 * 60 * 1000;
 const VALID_TOKEN = 'valid-invitation-token';
 
-function signedInAs(role: string | null) {
-  auth.mockResolvedValue(role ? { user: { id: 'user-1', role } } : null);
+function signedInAs(role: string | null, id = COLLECTOR_USER_ID) {
+  auth.mockResolvedValue(role ? { user: { id, role } } : null);
 }
 
+/*
+ * A fixed id for the signed-in collector.
+ *
+ * It used to be an arbitrary string, because nothing looked it up. Visibility
+ * is now resolved through this collector's membership, so the user and the
+ * membership must genuinely exist.
+ */
+const COLLECTOR_USER_ID = 'collector-user-1';
+
+/**
+ * A collector, an artist and a work.
+ *
+ * "Released" now means placed with THIS collector - an audience they belong to,
+ * plus the artist's permission - rather than a status anyone could reach.
+ */
 async function seed({ artworkStatus = 'PUBLISHED', artistApproved = true } = {}) {
   await prisma.memberInvitation.create({
     data: {
@@ -45,11 +60,27 @@ async function seed({ artworkStatus = 'PUBLISHED', artistApproved = true } = {})
       medium: 'Mixed media',
       dimensions: '80 x 60 cm',
       price: '2600',
-      status: artworkStatus as 'PUBLISHED' | 'DRAFT',
+      status: 'DRAFT',
     },
   });
 
-  return { artwork };
+  // The collector, and their standing with Qhakaza.
+  const collectorUser = await prisma.user.create({
+    data: { id: COLLECTOR_USER_ID, email: 'member@test.local', role: 'COLLECTOR' },
+  });
+  const intake = await prisma.collectorIntake.create({
+    data: { fullName: 'A Member', email: collectorUser.email },
+  });
+  const membership = await prisma.membership.create({
+    data: { intakeId: intake.id, userId: collectorUser.id, status: 'ACTIVE' },
+  });
+
+  // Only place the work when the test wants it visible to this collector.
+  if (artworkStatus === 'PUBLISHED') {
+    await releaseToCollectors(artwork.id, artist.id, [membership.id]);
+  }
+
+  return { artwork, membership };
 }
 
 const VALID = {
@@ -77,7 +108,7 @@ describe('submitEnquiry', () => {
     expect(result.ok).toBe(true);
     const note = await prisma.privateNoteSubmission.findFirstOrThrow();
     expect(note.subject).toBe(VALID.subject);
-    expect(note.createdById).toBe('user-1');
+    expect(note.createdById).toBe(COLLECTOR_USER_ID);
   });
 
   it('attaches an enquiry to a released work', async () => {

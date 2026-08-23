@@ -57,6 +57,13 @@ export const CORE_ENTITIES = [
   'Briefing',
   'BriefingRelation',
   'LegalDocumentVersion',
+
+  // Visibility and release
+  'AudienceType',
+  'Audience',
+  'AudienceMember',
+  'ArtworkRelease',
+  'ArtistPermission',
   'Artist',
   'Artwork',
   'NewsArticle',
@@ -134,6 +141,14 @@ export const ENTITY_DOMAIN = {
   Briefing: 'platform',
   BriefingRelation: 'platform',
   LegalDocumentVersion: 'platform',
+
+  // Visibility and release. Who may see what is Qhakaza's decision to
+  // make and nobody else's to read.
+  AudienceType: 'platform',
+  Audience: 'platform',
+  AudienceMember: 'platform',
+  ArtworkRelease: 'platform',
+  ArtistPermission: 'platform',
   ActivationAttempt: 'collector',
   PrivateNoteSubmission: 'collector',
 

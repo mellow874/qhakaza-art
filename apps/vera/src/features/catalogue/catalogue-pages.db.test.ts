@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { prisma } from '@qhakaza/shared-db';
+import { releasePublicly } from '@qhakaza/shared-db';
 import { makeArtistWithProfile, resetDb } from '@tests/helpers/db';
 
 const { getArtistBySlug, getBrowseWorks, getWorkById } = await import('./queries');
@@ -8,16 +9,20 @@ const { getArtistBySlug, getBrowseWorks, getWorkById } = await import('./queries
 /**
  * The catalogue pages.
  *
- * Every one of these asserts the same thing from a different angle: nothing
- * reaches the public that is not PUBLISHED work by an approved artist. The pages
- * themselves hold no conditions, so if these hold, the pages are safe.
+ * Every one asserts the same thing from a different angle: nothing reaches the
+ * public that Qhakaza has not deliberately released for editorial use, with the
+ * artist's permission. The pages hold no conditions of their own, so if these
+ * hold, the pages are safe.
+ *
+ * `status: 'PUBLISHED'` used to be the whole test. It is now three facts, and
+ * `releasePublicly` supplies all three.
  */
 
 async function makePiece(
   artistId: string,
   overrides: { title?: string; status?: 'DRAFT' | 'PUBLISHED' | 'SOLD' | 'HIDDEN' } = {},
 ) {
-  return prisma.artwork.create({
+  const piece = await prisma.artwork.create({
     data: {
       artistId,
       title: overrides.title ?? 'A piece',
@@ -27,9 +32,19 @@ async function makePiece(
       dimensions: '600 x 900 mm',
       price: 5000,
       currency: 'ZAR',
-      status: overrides.status ?? 'PUBLISHED',
+      status: 'DRAFT',
     },
   });
+
+  // Anything the old tests called PUBLISHED means "the public should see it",
+  // which now requires an editorial release and the artist's permission.
+  if ((overrides.status ?? 'PUBLISHED') === 'PUBLISHED') {
+    await releasePublicly(piece.id, artistId);
+  } else if (overrides.status !== 'DRAFT') {
+    await prisma.artwork.update({ where: { id: piece.id }, data: { status: 'ARCHIVED' } });
+  }
+
+  return piece;
 }
 
 beforeEach(async () => {

@@ -7,18 +7,10 @@ import { buttonStyles } from '@qhakaza/shared-ui';
 
 import { ArtCard } from '@/features/catalogue/art-card';
 import { getWorkById } from '@/features/catalogue/queries';
-import { formatMoney } from '@/lib/format/money';
-import type { Currency } from '@/lib/validation/art';
-import { CURRENCIES } from '@/lib/validation/art';
 
 export const dynamic = 'force-dynamic';
 
 type Props = { params: Promise<{ id: string }> };
-
-/** `currency` is a plain column, so it is checked before it reaches Intl. */
-function asCurrency(value: string): Currency {
-  return (CURRENCIES as readonly string[]).includes(value) ? (value as Currency) : 'ZAR';
-}
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
@@ -36,8 +28,9 @@ export default async function ArtworkPage({ params }: Props) {
   const { id } = await params;
   const found = await getWorkById(id);
 
-  // A draft, a sold piece or work by an unapproved artist is a 404 here. The
-  // query decides that; this page never sees anything it should not show.
+  // Anything not authorised for public editorial use is a 404 here - a draft,
+  // an approved-but-unreleased work, or one whose artist has not granted public
+  // publication. The query decides; this page never sees what it must not show.
   if (!found) notFound();
 
   const { work, alsoBy } = found;
@@ -77,7 +70,7 @@ export default async function ArtworkPage({ params }: Props) {
 
         <div className="flex flex-col gap-8 lg:sticky lg:top-24 lg:self-start">
           <div className="flex flex-col gap-3">
-            <p className="eyebrow">Available</p>
+            <p className="eyebrow">Selected work</p>
             <h1 className="text-4xl leading-[1.15] sm:text-5xl">{work.title}</h1>
             <Link
               href={`/artists/${work.artist.slug}`}
@@ -86,10 +79,6 @@ export default async function ArtworkPage({ params }: Props) {
               {work.artist.displayName}
             </Link>
           </div>
-
-          <p className="text-accent text-2xl">
-            {formatMoney(work.price, asCurrency(work.currency))}
-          </p>
 
           {work.description && (
             <p className="text-body leading-relaxed whitespace-pre-line">{work.description}</p>
@@ -107,11 +96,16 @@ export default async function ArtworkPage({ params }: Props) {
           )}
 
           {/*
-            No cart, no checkout — none is configured. An enquiry is the honest
-            next step, and it is what the collective does anyway.
+            NOT AN OFFER. This page introduces a work Qhakaza has chosen to
+            show; availability and price are collector-platform matters and are
+            governed there. Asking about the programme is the honest next step.
           */}
+          <p className="text-muted text-sm leading-relaxed">
+            Work shown here is presented as part of Qhakaza&rsquo;s editorial programme.
+            Availability and acquisition are handled privately with member collectors.
+          </p>
           <Link href="/contact" className={buttonStyles({ size: 'lg', className: 'self-start' })}>
-            Enquire about this work
+            Enquire about the programme
           </Link>
         </div>
       </div>

@@ -51,38 +51,59 @@ enum Role {
   ANALYST
 }
 
-/// The artwork review workflow, as specified by the handover brief:
+/// The publication states.
 ///
-///   DRAFT -> SUBMITTED -> UNDER_REVIEW -> APPROVED -> PUBLISHED
+///   DRAFT -> SUBMITTED -> UNDER_REVIEW -> APPROVED -> COLLECTOR_READY
+///        -> RELEASED_TO_AUDIENCE
 ///
-/// plus RETURNED_FOR_INFORMATION and REJECTED, which can interrupt it, and
-/// SOLD and HIDDEN, which follow publication.
+/// plus RETURNED_FOR_INFORMATION and REJECTED, which interrupt it, and
+/// RESTRICTED, PUBLIC_EDITORIAL, ARCHIVED and SUPERSEDED.
 ///
-/// APPROVED and PUBLISHED are deliberately distinct. Approval is the vetting
-/// decision; publication is the moment collectors can see it. Keeping them
-/// apart means work can be approved in a batch and released deliberately.
+/// APPROVAL IS NOT PUBLICATION, AND PUBLICATION IS NOT PUBLIC. Those are three
+/// different facts:
 ///
-/// LISTED is the ORIGINAL spelling of PUBLISHED, kept because PostgreSQL
-/// cannot drop an enum value without recreating the type. Existing rows were
-/// migrated; nothing writes it any more.
+///   APPROVED              Qhakaza has vetted it. Nobody outside can see it.
+///   COLLECTOR_READY       A collector-safe projection exists. Still nobody
+///                         outside can see it - no audience holds it yet.
+///   RELEASED_TO_AUDIENCE  At least one un-revoked ArtworkRelease exists. Who
+///                         sees it is decided by that release, never by this
+///                         column.
+///   PUBLIC_EDITORIAL      Separately authorised editorial use. Requires the
+///                         artist's PUBLISH_PUBLICLY permission.
+///
+/// The status says how far along a work is. It never says who may see it -
+/// that is what ArtworkRelease is for, and RLS reads the release, not this.
+///
+/// PUBLISHED, SOLD, HIDDEN and LISTED are retired spellings kept because
+/// PostgreSQL cannot drop an enum value. Existing rows were migrated:
+/// PUBLISHED -> COLLECTOR_READY (approved, but released to nobody until
+/// assigned), SOLD and HIDDEN -> ARCHIVED. Nothing writes them now.
 enum ArtStatus {
-  /// The artist is still working on the record. Only they can see it.
   DRAFT
-  /// Handed to Qhakaza. The artist can no longer edit it silently.
   SUBMITTED
-  /// A reviewer has picked it up.
   UNDER_REVIEW
-  /// Sent back with a question. The artist can see the request and resubmit.
   RETURNED_FOR_INFORMATION
-  /// Vetted, but not yet visible to anyone outside Qhakaza.
   APPROVED
-  /// Live. The only status the public may see.
-  PUBLISHED
-  /// Declined. Retained, never deleted.
+  /// Vetted and prepared for collectors, held back until released.
+  COLLECTOR_READY
+  /// One or more audiences hold it. The releases say which.
+  RELEASED_TO_AUDIENCE
+  /// Deliberately withheld - a dispute, a request, an embargo.
+  RESTRICTED
+  /// Authorised for editorial or brand use. Never inventory.
+  PUBLIC_EDITORIAL
   REJECTED
-  SOLD
-  HIDDEN
+  /// No longer in circulation. Retained, never deleted.
+  ARCHIVED
+  /// Replaced by a newer record of the same work.
+  SUPERSEDED
 
+  /// @deprecated see the note above
+  PUBLISHED
+  /// @deprecated folded into ARCHIVED
+  SOLD
+  /// @deprecated folded into ARCHIVED
+  HIDDEN
   /// @deprecated original spelling of PUBLISHED
   LISTED
 }
@@ -242,8 +263,9 @@ model Artist {
   updatedAt   DateTime @updatedAt @map("updated_date")
   createdById String?  @map("created_by_id")
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  artworks Artwork[]
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artworks    Artwork[]
+  permissions ArtistPermission[]
 
   @@index([approved])
   @@index([createdById])
@@ -268,6 +290,10 @@ model Artwork {
   artist         Artist                 @relation(fields: [artistId], references: [id], onDelete: Cascade)
   reviewRequests ArtworkReviewRequest[]
   orders         Order[]
+
+  // Visibility and release
+  releases    ArtworkRelease[]
+  permissions ArtistPermission[]
 
   // VERA
   evidence     Evidence[]
@@ -384,6 +410,7 @@ model Membership {
   intake      CollectorIntake?        @relation(fields: [intakeId], references: [id], onDelete: SetNull)
   invitations MemberInvitation[]
   notes       PrivateNoteSubmission[]
+  audiences   AudienceMember[]
 
   @@index([status])
   @@index([userId])
@@ -1874,5 +1901,185 @@ model LegalDocumentVersion {
 
   @@unique([documentKey, versionNumber])
   @@index([documentKey, status, effectiveFrom])
+  @@index([createdById])
+}
+
+// ===========================================================================
+// VISIBILITY AND RELEASE
+//
+// Approval is not publication. Publication to one collector is not publication
+// to all. Neither is publication to the world. Those are four different facts
+// and the schema keeps them apart.
+//
+// THE FOUR QUESTIONS the brief requires to be answerable about any record are
+// answered by rows, never inferred from a status column:
+//
+//   Where is this visible?   ArtworkRelease.tier
+//   Who may see it?          Audience -> AudienceMember -> Membership
+//   Why may they see it?     ArtworkRelease.reason, .releasedById, .releasedAt
+//   Which version?           ArtworkRelease.versionLabel
+//
+// A work reaches a collector only if an un-revoked release exists to an
+// audience that collector belongs to, AND the artist granted the matching
+// permission. Both conditions live in RLS, not in a query someone must
+// remember to write.
+// ===========================================================================
+
+/// Where a record is visible. The four contexts from the brief.
+enum VisibilityTier {
+  /// The submitting artist and Qhakaza internally.
+  ARTIST_WORKING_RECORD
+  /// Qhakaza only, while evidence and presentation are reviewed.
+  INTERNAL_REVIEW
+  /// An approved, collector-safe version released to a specific audience.
+  PRIVATE_COLLECTOR_PROJECTION
+  /// Separately authorised editorial or brand use. Never inventory.
+  PUBLIC_EDITORIAL
+}
+
+/// What an artist has allowed Qhakaza to do with their material.
+///
+/// STORING SOMETHING AND BEING ALLOWED TO USE IT ARE DIFFERENT MATTERS. A work
+/// without PUBLISH_PUBLICLY can never enter a public editorial state however
+/// many people approve it - enforced in RLS, not by convention.
+enum PermissionKind {
+  STORE_MATERIAL
+  SHARE_PRIVATELY_WITH_COLLECTORS
+  USE_IN_PRIVATE_BRIEF
+  PRESENT_TO_PARTNERS
+  PUBLISH_PUBLICLY
+  PUBLISH_ARTIST_STORY
+  RETAIN_DOCUMENTATION
+}
+
+/// A named group a work can be released to.
+///
+/// A TABLE OF TYPES, not an enum, because the brief requires the list to grow.
+/// Private brief, partner programme and private experience exist now as
+/// STRUCTURAL PLACEHOLDERS - the products behind them are a later phase.
+model AudienceType {
+  id            String  @id @default(cuid())
+  slug          String  @unique
+  label         String
+  /// False where the type exists structurally but the product does not yet.
+  isLiveProduct Boolean @default(false)
+  active        Boolean @default(true)
+  ordering      Int     @default(0)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  audiences Audience[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+model Audience {
+  id     String  @id @default(cuid())
+  typeId String?
+
+  name        String
+  description String?
+  /// Retired audiences stop receiving releases without breaking history.
+  active      Boolean @default(true)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  type     AudienceType?    @relation(fields: [typeId], references: [id], onDelete: SetNull)
+  members  AudienceMember[]
+  releases ArtworkRelease[]
+
+  @@index([active])
+  @@index([typeId])
+  @@index([createdById])
+}
+
+/// Who is in an audience.
+///
+/// Membership, not User: a collector's standing with Qhakaza is what grants
+/// sight of a work, and it can lapse or be revoked independently of the account.
+model AudienceMember {
+  id           String @id @default(cuid())
+  audienceId   String
+  membershipId String
+
+  addedById String?
+  removedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  audience   Audience   @relation(fields: [audienceId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([audienceId, membershipId])
+  @@index([membershipId, removedAt])
+  @@index([createdById])
+}
+
+/// The act of releasing a work to an audience, at a tier.
+///
+/// APPEND-MOSTLY. Withdrawing sets revokedAt rather than deleting, because who
+/// could see what, and when, is provenance and feeds VERA.
+model ArtworkRelease {
+  id         String @id @default(cuid())
+  artworkId  String
+  audienceId String
+
+  tier VisibilityTier @default(PRIVATE_COLLECTOR_PROJECTION)
+
+  /// Why this audience may see it. Shown to staff, never to the collector.
+  reason       String?
+  /// Which projection of the work this release refers to.
+  versionLabel String?
+
+  releasedById String?
+  releasedAt   DateTime  @default(now())
+  revokedAt    DateTime?
+  revokedById  String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artwork  Artwork  @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  audience Audience @relation(fields: [audienceId], references: [id], onDelete: Cascade)
+
+  @@index([artworkId, revokedAt])
+  @@index([audienceId, revokedAt])
+  @@index([tier, revokedAt])
+  @@index([createdById])
+}
+
+/// An artist's explicit permission, per artwork or for the artist generally.
+///
+/// `artworkId` null means the permission covers the artist's material as a
+/// whole. A work-specific row wins over a general one.
+model ArtistPermission {
+  id        String  @id @default(cuid())
+  artistId  String
+  artworkId String?
+
+  kind    PermissionKind
+  granted Boolean
+
+  /// What the artist actually did to confirm it, in their own record.
+  confirmingAction String?
+  decidedAt        DateTime @default(now())
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artist  Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  artwork Artwork? @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  @@unique([artistId, artworkId, kind])
+  @@index([artworkId, kind, granted])
   @@index([createdById])
 }

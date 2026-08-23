@@ -4,6 +4,7 @@ import { requireRole, requireToken } from '@qhakaza/shared-auth/guards';
 import { auth } from '@qhakaza/shared-auth/server';
 import { withActor } from '@qhakaza/shared-db';
 
+import { releasedToCollector } from './queries';
 import { enquirySchema } from '@/lib/validation/enquiry';
 
 /**
@@ -43,14 +44,20 @@ export async function submitEnquiry(input: unknown): Promise<EnquiryResult> {
     // are judged under the same actor — and RLS narrows the lookup to released
     // work whether or not the WHERE clause below says so.
     const written = await withActor({ role: 'collector', userId: grant.userId }, async (tx) => {
-      // An artworkId is only accepted if it names a work actually released to
-      // members. Otherwise a crafted request could attach an enquiry to a draft
-      // and have its title read back from the advisor's screen.
+      // An artworkId is only accepted if it names a work released to THIS
+      // collector. "Released to members" was the old test, and it was the same
+      // test the public site used - so a crafted request could attach an
+      // enquiry to any published work, or to a draft, and have its title read
+      // back from the advisor's screen.
       let artworkId: string | null = null;
 
       if (parsed.data.artworkId) {
         const released = await tx.artwork.findFirst({
-          where: { id: parsed.data.artworkId, status: 'PUBLISHED', artist: { approved: true } },
+          where: {
+            id: parsed.data.artworkId,
+            artist: { approved: true },
+            ...releasedToCollector(grant.userId),
+          },
           select: { id: true },
         });
         if (!released) return false;

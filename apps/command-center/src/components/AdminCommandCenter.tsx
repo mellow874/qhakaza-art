@@ -155,7 +155,7 @@ export function AdminCommandCenter({
                 </span>
                 <ActionButton
                   variant="primary"
-                  label="Release to members"
+                  label="Prepare for collectors"
                   action={setArtworkRelease.bind(null, { artworkId: artwork.id, release: true })}
                 />
               </Row>
@@ -370,7 +370,7 @@ export function AdminCommandCenter({
           {[
             ['Artists', analytics.totals.artists],
             ['Approved', analytics.totals.approvedArtists],
-            ['Released works', analytics.totals.releasedArtworks],
+            ['Prepared works', analytics.totals.releasedArtworks],
             ['Intakes', analytics.totals.intakes],
             ['Active members', analytics.totals.activeMemberships],
           ].map(([label, value]) => (

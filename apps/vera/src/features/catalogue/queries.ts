@@ -1,4 +1,4 @@
-import { prisma } from '@qhakaza/shared-db';
+import { Prisma, prisma } from '@qhakaza/shared-db';
 
 const DEFAULT_WORK_LIMIT = 8;
 const DEFAULT_ARTIST_LIMIT = 3;
@@ -6,21 +6,68 @@ const DEFAULT_ARTIST_LIMIT = 3;
 /**
  * What the public is allowed to see.
  *
- * Two conditions, both required: the piece is PUBLISHED (not a draft, not sold,
- * not hidden by an admin) *and* its artist has been approved. Approval is a
- * real gate, so an unapproved storefront is invisible until an admin acts.
+ * THE PUBLIC SITE IS NOT A CATALOGUE. It introduces Qhakaza's artist
+ * programme, its methodology and selected artists. Availability, pricing and
+ * collector-specific intelligence are governed and live elsewhere.
  *
- * Every public query must reuse this rather than rewriting the conditions.
+ * This condition used to read `{ status: 'PUBLISHED', artist: { approved } }`
+ * - which was byte-identical to the collector platform's condition, so
+ * approving a work put it on the open web with its price AND in every
+ * collector's private area at the same moment. That is the defect this phase
+ * exists to remove.
+ *
+ * Four conditions now, all required:
+ *
+ *   the artist is approved
+ *   the work is in PUBLIC_EDITORIAL
+ *   an un-revoked release exists at the PUBLIC_EDITORIAL tier
+ *   the artist granted PUBLISH_PUBLICLY
+ *
+ * RLS enforces the same thing independently, so a query that forgot this would
+ * still return nothing. This exists so the intent is readable, not because the
+ * database trusts it.
  */
-export const PUBLICLY_VISIBLE_WORK = {
-  status: 'PUBLISHED',
+export const PUBLICLY_VISIBLE_WORK: Prisma.ArtworkWhereInput = {
+  status: 'PUBLIC_EDITORIAL',
   artist: { approved: true },
-} as const;
+  releases: {
+    some: { tier: 'PUBLIC_EDITORIAL', revokedAt: null },
+  },
+  /*
+   * A permission may be work-specific OR cover the artist's material as a
+   * whole (artworkId null). The `permissions` relation on Artwork only sees
+   * the first kind, so both are spelled out - matching what the RLS function
+   * does. Getting this wrong hid every legitimately released work.
+   */
+  OR: [
+    { permissions: { some: { kind: 'PUBLISH_PUBLICLY', granted: true } } },
+    { artist: { permissions: { some: { kind: 'PUBLISH_PUBLICLY', granted: true, artworkId: null } } } },
+  ],
+};
+
+/*
+ * WHAT A PUBLIC VISITOR MAY SEE OF A WORK: id, title, images, medium,
+ * dimensions, createdAt and the artist's name. NO PRICE, NO AVAILABILITY.
+ *
+ * Written out at each call site rather than shared as a constant. Prisma infers
+ * the return type from a literal `select`, and a shared object - whether
+ * `as const` or `satisfies` - widens it enough that Next's build-time type
+ * check fails while `tsc --noEmit` passes. Repetition beats a build that only
+ * breaks on deploy.
+ *
+ * If price ever appears in one of these, it is a leak, not a feature.
+ */
 
 export async function getFeaturedWorks({ limit = DEFAULT_WORK_LIMIT }: { limit?: number } = {}) {
   return prisma.artwork.findMany({
     where: PUBLICLY_VISIBLE_WORK,
-    include: {
+    select: {
+      id: true,
+      title: true,
+      images: true,
+      medium: true,
+      dimensions: true,
+      createdAt: true,
       artist: { select: { displayName: true, slug: true } },
     },
     orderBy: { createdAt: 'desc' },
@@ -40,16 +87,18 @@ export async function getFeaturedArtists({
   const artists = await prisma.artist.findMany({
     where: {
       approved: true,
-      artworks: { some: { status: 'PUBLISHED' } },
+      // An artist is featured when they have work Qhakaza has chosen to show
+      // publicly - not merely when they have work.
+      artworks: { some: PUBLICLY_VISIBLE_WORK },
     },
     select: {
       id: true,
       displayName: true,
       slug: true,
       statement: true,
-      _count: { select: { artworks: { where: { status: 'PUBLISHED' } } } },
+      _count: { select: { artworks: { where: PUBLICLY_VISIBLE_WORK } } },
       artworks: {
-        where: { status: 'PUBLISHED' },
+        where: PUBLICLY_VISIBLE_WORK,
         orderBy: { createdAt: 'desc' },
         take: 1,
         select: { images: true },
@@ -80,7 +129,15 @@ export type FeaturedArtist = Awaited<ReturnType<typeof getFeaturedArtists>>[numb
 export async function getBrowseWorks({ limit = 60 }: { limit?: number } = {}) {
   return prisma.artwork.findMany({
     where: PUBLICLY_VISIBLE_WORK,
-    include: { artist: { select: { displayName: true, slug: true } } },
+    select: {
+      id: true,
+      title: true,
+      images: true,
+      medium: true,
+      dimensions: true,
+      createdAt: true,
+      artist: { select: { displayName: true, slug: true } },
+    },
     orderBy: { createdAt: 'desc' },
     take: limit,
   });
@@ -106,16 +163,11 @@ export async function getArtistBySlug(slug: string) {
       slug: true,
       statement: true,
       artworks: {
-        where: { status: 'PUBLISHED' },
+        where: PUBLICLY_VISIBLE_WORK,
         orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          title: true,
-          images: true,
-          medium: true,
-          price: true,
-          currency: true,
-        },
+        // No price. An artist page introduces a practice; it does not offer
+        // anything for sale.
+        select: { id: true, title: true, images: true, medium: true },
       },
     },
   });
@@ -135,9 +187,24 @@ export async function getArtistBySlug(slug: string) {
 
 /** One work, with its artist and a few others by the same hand. */
 export async function getWorkById(id: string) {
+  /*
+   * Spelled out rather than spread from PUBLIC_WORK_FIELDS.
+   *
+   * Spreading an `as const` object into a Prisma `select` loses the narrowing
+   * under Next's build-time type check - it compiled under `tsc --noEmit` and
+   * failed the build, which is a difference worth not relying on. Still no
+   * price and no availability.
+   */
   const work = await prisma.artwork.findFirst({
     where: { id, ...PUBLICLY_VISIBLE_WORK },
-    include: {
+    select: {
+      id: true,
+      title: true,
+      images: true,
+      medium: true,
+      dimensions: true,
+      createdAt: true,
+      description: true,
       artist: { select: { id: true, displayName: true, slug: true, statement: true } },
     },
   });
@@ -145,8 +212,23 @@ export async function getWorkById(id: string) {
   if (!work) return null;
 
   const alsoBy = await prisma.artwork.findMany({
-    where: { ...PUBLICLY_VISIBLE_WORK, artistId: work.artistId, id: { not: work.id } },
-    include: { artist: { select: { displayName: true, slug: true } } },
+    where: {
+      ...PUBLICLY_VISIBLE_WORK,
+      // By id, not by spreading the shared `artist` filter: that property is a
+      // union in Prisma's input types, and spreading it widens the whole query
+      // enough that the select stops narrowing the result.
+      artistId: work.artist.id,
+      id: { not: work.id },
+    },
+    select: {
+      id: true,
+      title: true,
+      images: true,
+      medium: true,
+      dimensions: true,
+      createdAt: true,
+      artist: { select: { displayName: true, slug: true } },
+    },
     orderBy: { createdAt: 'desc' },
     take: 4,
   });

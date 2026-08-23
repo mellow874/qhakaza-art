@@ -1,5 +1,7 @@
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 
+import { auth } from '@qhakaza/shared-auth/server';
 import { buttonStyles } from '@qhakaza/shared-ui';
 
 import { getReleasedArtists } from '@/features/private/queries';
@@ -18,15 +20,21 @@ export default async function PrivateOverviewPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  const artists = await getReleasedArtists({ limit: 6 });
+
+  // Scoped to this collector. There is no "what members see" any more.
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) notFound();
+
+  const artists = await getReleasedArtists({ userId, limit: 6 });
 
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-20">
       <p className="eyebrow">Your suite</p>
       <h1 className="mt-6 text-4xl sm:text-5xl">Welcome back</h1>
       <p className="text-body mt-6 max-w-2xl leading-relaxed">
-        Everything here has passed through vetting before reaching you. Artists are approved and
-        works released by the Command Center; nothing is shown at submission stage.
+        Everything here was chosen for you. Artists are vetted and each work is placed with a
+        collector deliberately, so what you see is yours rather than a shared list.
       </p>
 
       <section aria-labelledby="released-artists" className="mt-16">

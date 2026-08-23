@@ -59,12 +59,17 @@ export type RlsRole = (typeof RLS_ROLES)[number];
 export type Operation = 'select' | 'insert' | 'update' | 'delete';
 
 /**
- * `true`  — unconditional.
- * `'own'` — only rows belonging to the actor (see OWNERSHIP).
- * `'released'` — only vetted, published rows (see RELEASED).
- * absent  — denied.
+ * `true`       — unconditional.
+ * `'own'`      — only rows belonging to the actor (see OWNERSHIP).
+ * `'released'` — only what is authorised for PUBLIC view (see RELEASED).
+ * `'audience'` — only what has been released to an audience this actor belongs
+ *                to (see AUDIENCE_RELEASED). Distinct from `'released'` on
+ *                purpose: "the public may see it" and "this collector may see
+ *                it" were previously the same predicate, which is how every
+ *                collector ended up seeing the public catalogue.
+ * absent       — denied.
  */
-export type Grant = true | 'own' | 'released';
+export type Grant = true | 'own' | 'released' | 'audience';
 
 export type EntityPolicy = Partial<Record<Operation, Partial<Record<RlsRole, Grant>>>>;
 
@@ -77,17 +82,42 @@ export type EntityPolicy = Partial<Record<Operation, Partial<Record<RlsRole, Gra
  */
 export const OWNERSHIP: Partial<Record<CoreEntity, string>> = {
   Artist: `"userId" = %UID%`,
+  ArtistPermission: `"artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)`,
   Artwork: `"artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)`,
   Membership: `"userId" = %UID%`,
   PrivateNoteSubmission: `"membershipId" IN (SELECT "id" FROM "Membership" WHERE "userId" = %UID%)`,
 };
 
-/** What "vetted and released" means, per entity. Never raw submissions. */
+/**
+ * What a given actor may see because it was RELEASED TO AN AUDIENCE they belong
+ * to. Keyed by entity, same shape as OWNERSHIP and RELEASED.
+ */
+export const AUDIENCE_RELEASED: Partial<Record<CoreEntity, string>> = {
+  /*
+   * What a COLLECTOR may see of an artwork.
+   *
+   * Not "approved", not "published" - released, to an audience this collector
+   * belongs to, with the artist's permission to share privately. Same function
+   * reasoning as above: a collector must not be able to read Qhakaza's
+   * distribution tables, so the check runs inside a definer function.
+   */
+  Artwork: `qhakaza_collector_sees_artwork("Artwork"."id", %UID%)`,
+};
+
+/** What "authorised for public view" means, per entity. Never raw submissions. */
 export const RELEASED: Partial<Record<CoreEntity, string>> = {
   Artist: `"approved" = true`,
-  // PUBLISHED only. Not APPROVED: approval is the vetting decision, publication
-  // is the release, and an approved-but-unreleased work must stay invisible.
-  Artwork: `"status" = 'PUBLISHED' AND "artistId" IN (SELECT "id" FROM "Artist" WHERE "approved" = true)`,
+  /*
+   * PUBLIC means EDITORIAL ONLY, and it is deliberately hard to satisfy:
+   * approved artist, PUBLIC_EDITORIAL status, an un-revoked editorial release,
+   * and the artist's PUBLISH_PUBLICLY permission. Approval alone gets nowhere
+   * near it - before, `status = 'PUBLISHED'` was the whole test.
+   *
+   * Delegated to a SECURITY DEFINER function because RLS applies inside a
+   * policy's own subqueries, and the tables this must read are ones the public
+   * cannot read. See 20260818000300_visibility_functions.
+   */
+  Artwork: `qhakaza_public_sees_artwork("Artwork"."id")`,
   NewsArticle: `"status" = 'PUBLISHED'`,
   FaqItem: `"published" = true`,
   Briefing: `"status" = 'PUBLISHED'`,
@@ -118,11 +148,23 @@ export const RLS_MATRIX = {
     delete: { admin: true },
   },
   Artwork: {
+    /*
+     * THE CHANGE THIS PHASE EXISTS FOR.
+     *
+     * `collector` was 'released' - the same predicate as `public`, so every
+     * collector saw exactly the public catalogue. It is now 'audience': a
+     * release must exist, to an audience holding this collector, with the
+     * artist's permission to share privately.
+     *
+     * `public` remains 'released', but RELEASED itself now means editorial
+     * authorisation rather than "approved".
+     */
     select: {
       admin: true,
       advisor: true,
+      analyst: true,
       artist: 'own',
-      collector: 'released',
+      collector: 'audience',
       public: 'released',
     },
     insert: { admin: true, artist: 'own' },
@@ -449,6 +491,45 @@ export const RLS_MATRIX = {
     update: { admin: true },
     delete: {},
   },
+  // --- Visibility and release --------------------------------------------
+  // Staff decide who sees what. No collector, artist or public grant anywhere:
+  // a collector must not be able to read the shape of Qhakaza's distribution,
+  // only receive what it produces.
+  AudienceType: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  Audience: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  AudienceMember: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  ArtworkRelease: {
+    // Never deleted. Who could see what, and when, is provenance and feeds
+    // VERA. Withdrawing sets revokedAt, which is an UPDATE.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  ArtistPermission: {
+    // An artist may READ what they have granted - being unable to see your own
+    // consent record would be indefensible - but never write it here. Consent
+    // is recorded through an action that captures how it was given.
+    select: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
   MediaAsset: {
     // Artists write their own uploads and read them back. Staff see everything.
     // Collectors are NOT granted a read: released artwork images are served
@@ -572,7 +653,12 @@ export function policyExpression(entity: CoreEntity, operation: Operation): stri
       continue;
     }
 
-    const fragment = grant === 'own' ? OWNERSHIP[entity] : RELEASED[entity];
+    const fragment =
+      grant === 'own'
+        ? OWNERSHIP[entity]
+        : grant === 'audience'
+          ? AUDIENCE_RELEASED[entity]
+          : RELEASED[entity];
     if (!fragment) {
       throw new Error(
         `${entity}.${operation} grants '${grant}' to ${role} but no ${grant} predicate is defined`,

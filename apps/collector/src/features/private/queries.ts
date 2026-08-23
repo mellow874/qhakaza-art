@@ -18,15 +18,65 @@ import { withActor } from '@qhakaza/shared-db';
  * among the 13, and per your decision members currently share one pool. The
  * vetting gate is real; the personalisation is absent, not faked.
  */
-export const RELEASED_TO_MEMBERS = {
-  status: 'PUBLISHED',
-  artist: { approved: true },
-} as const;
+/**
+ * What THIS collector may see.
+ *
+ * This constant used to read `{ status: 'PUBLISHED', artist: { approved } }` -
+ * byte-identical to the public site's condition. Every member therefore saw
+ * the same pool, and that pool was the public catalogue. The premise of the
+ * business is that neither of those things is true.
+ *
+ * A work now reaches a collector only when all of this holds:
+ *
+ *   an un-revoked release exists at the PRIVATE_COLLECTOR_PROJECTION tier
+ *   to an audience the collector belongs to, via an ACTIVE membership
+ *   and the artist granted SHARE_PRIVATELY_WITH_COLLECTORS
+ *
+ * It takes the user id because there is no such thing as "what collectors can
+ * see" any more - only what a named collector can see. RLS enforces the same
+ * conditions independently, so a caller who forgot to scope would get nothing
+ * rather than everything.
+ */
+export function releasedToCollector(userId: string) {
+  return {
+    releases: {
+      some: {
+        tier: 'PRIVATE_COLLECTOR_PROJECTION',
+        revokedAt: null,
+        audience: {
+          members: {
+            some: {
+              removedAt: null,
+              membership: { userId, status: 'ACTIVE' },
+            },
+          },
+        },
+      },
+    },
+    // Work-specific or artist-wide, as above.
+    OR: [
+      { permissions: { some: { kind: 'SHARE_PRIVATELY_WITH_COLLECTORS', granted: true } } },
+      {
+        artist: {
+          permissions: {
+            some: { kind: 'SHARE_PRIVATELY_WITH_COLLECTORS', granted: true, artworkId: null },
+          },
+        },
+      },
+    ],
+  } as const;
+}
 
-export async function getReleasedArtworks({ limit = 24 }: { limit?: number } = {}) {
-  return withActor({ role: 'collector' }, (tx) =>
+export async function getReleasedArtworks({
+  userId,
+  limit = 24,
+}: {
+  userId: string;
+  limit?: number;
+}) {
+  return withActor({ role: 'collector', userId }, (tx) =>
     tx.artwork.findMany({
-      where: RELEASED_TO_MEMBERS,
+      where: releasedToCollector(userId),
       select: {
         id: true,
         title: true,
@@ -46,16 +96,27 @@ export async function getReleasedArtworks({ limit = 24 }: { limit?: number } = {
 export type ReleasedArtwork = Awaited<ReturnType<typeof getReleasedArtworks>>[number];
 
 /** Approved artists who actually have released work — never an empty room. */
-export async function getReleasedArtists({ limit = 12 }: { limit?: number } = {}) {
-  const artists = await withActor({ role: 'collector' }, (tx) =>
+export async function getReleasedArtists({
+  userId,
+  limit = 12,
+}: {
+  userId: string;
+  limit?: number;
+}) {
+  const artists = await withActor({ role: 'collector', userId }, (tx) =>
     tx.artist.findMany({
-      where: { approved: true, artworks: { some: { status: 'PUBLISHED' } } },
+      where: {
+        approved: true,
+        // An artist appears because work of theirs was placed with THIS
+        // collector - not because they have published work somewhere.
+        artworks: { some: releasedToCollector(userId) },
+      },
       select: {
         id: true,
         displayName: true,
         slug: true,
         statement: true,
-        _count: { select: { artworks: { where: { status: 'PUBLISHED' } } } },
+        _count: { select: { artworks: { where: releasedToCollector(userId) } } },
       },
       orderBy: { createdAt: 'desc' },
       take: limit,
