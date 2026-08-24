@@ -75,7 +75,7 @@ unreadable by the others.
 
 | Project        | `AUTH_URL`                       |
 | -------------- | -------------------------------- |
-| Vera           | `https://qhakaza.art`            |
+| The Artist Intelligence Platform           | `https://qhakaza.art`            |
 | Collector      | `https://collectors.qhakaza.art` |
 | Command Center | `https://ops.qhakaza.art`        |
 
@@ -86,7 +86,7 @@ Optional, where used: `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (redirect URI
 >
 > If you point it at the owner, every RLS policy is silently bypassed and the
 > apps regain full access to every table — including collector intakes from
-> Vera. It will look like it works. That is exactly the danger.
+> the Artist Intelligence Platform. It will look like it works. That is exactly the danger.
 >
 > Sanity check after the first deploy: the app connection should report
 > `superuser: false, bypassrls: false`.
@@ -95,8 +95,45 @@ Optional, where used: `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (redirect URI
 
 ## The database
 
-Any managed Postgres works — Neon, Supabase, RDS, Vercel Postgres. It needs to
-support roles and RLS, which they all do.
+Any managed Postgres works — Supabase, Neon, RDS, Vercel Postgres. It needs to
+support creating a role and enabling RLS, which they all do.
+
+**Nothing in the code is tied to a provider.** You are swapping a connection
+string, not migrating. The local `embedded-postgres` is a development
+convenience and is a devDependency — it cannot and does not run on Vercel.
+
+### Supabase specifically
+
+Supabase gives you two connection strings, and **which one goes where matters**:
+
+| Variable              | Supabase string                            | Port |
+| --------------------- | ------------------------------------------ | ---- |
+| `DIRECT_DATABASE_URL` | **Direct connection**                      | 5432 |
+| `DATABASE_URL`        | **Transaction pooler** + `?pgbouncer=true` | 6543 |
+
+```
+DIRECT_DATABASE_URL="postgresql://postgres:PW@db.PROJECT.supabase.co:5432/postgres"
+DATABASE_URL="postgresql://qhakaza_app:APP_PW@aws-0-REGION.pooler.supabase.com:6543/postgres?pgbouncer=true"
+```
+
+Use the **transaction** pooler, not session mode. `withActor()` sets the actor
+with `set_config(..., true)`, which is transaction-scoped — that is exactly what
+transaction pooling supports, and it is why it was written that way.
+
+Three Supabase notes:
+
+1. **You are using Supabase as a database only** — not Supabase Auth, not its
+   client libraries. Sign-in is Auth.js against the `User` table.
+2. **`postgres` is the owner.** Run migrations as it; the migration creates
+   `qhakaza_app` and its grants for you.
+3. Supabase's dashboard has its own RLS UI. Ignore it — the policies here are in
+   migrations, generated from `rls.ts`. Editing them in the dashboard would drift
+   from the repo, and `rls.db.test.ts` would start failing, which is the point.
+
+### Neon
+
+Simpler: the pooled string for `DATABASE_URL`, the unpooled one for
+`DIRECT_DATABASE_URL`. Same two-string shape.
 
 **One-time setup**, run as the owner:
 
@@ -147,14 +184,14 @@ is transaction-local, which is precisely why it was written that way.
 
 | Project        | Suggested domain                           |
 | -------------- | ------------------------------------------ |
-| Vera           | `qhakaza.art` — the public, indexable site |
+| The Artist Intelligence Platform           | `qhakaza.art` — the public, indexable site |
 | Collector      | `collectors.qhakaza.art`                   |
 | Command Center | `ops.qhakaza.art`                          |
 
-Nothing links Vera to the collector site, so the domains can be entirely
+Nothing links the Artist Intelligence Platform to the collector site, so the domains can be entirely
 unrelated if you would rather they were not visibly connected.
 
-`robots.ts` in each app already reflects this: Vera is indexable, the collector
+`robots.ts` in each app already reflects this: the Artist Intelligence Platform is indexable, the collector
 shell is indexable but `/private/` is disallowed, and the Command Center
 disallows everything.
 

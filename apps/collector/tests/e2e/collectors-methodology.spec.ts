@@ -38,9 +38,11 @@ test('closes with the essence statement and the membership action', async ({ pag
   const essence = page.getByRole('region', { name: /in essence/i });
   await expect(essence.getByText(/a private membership that offers collectors/i)).toBeVisible();
 
+  // Membership, not onboarding: this button is about the fee, so it belongs to
+  // the consideration flow rather than the intake.
   await expect(page.getByRole('link', { name: /apply for membership/i })).toHaveAttribute(
     'href',
-    '/collectors/apply',
+    '/collectors/membership-consideration',
   );
 });
 

@@ -4,11 +4,38 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 4320);
 const baseURL = `http://127.0.0.1:${PORT}`;
 
+/*
+ * E2E runs against the LOCAL test database, never the live one.
+ *
+ * The app `.env` files point at Supabase so the dev servers and the demo use
+ * it — but a suite that creates and deletes accounts must not do that against
+ * production data, and a remote pooled connection adds enough latency under
+ * parallel workers to fail on timing rather than on behaviour.
+ *
+ * Set on `process.env` as well as on `webServer.env` because both halves need
+ * it: the app under test reads the latter, and the fixtures (which seed and
+ * tear down) run in this process. `dotenv` does not overwrite variables that
+ * are already set, so doing it here wins over the `.env` file.
+ */
+const TEST_DATABASE =
+  process.env.E2E_DATABASE_URL ??
+  'postgresql://qhakaza_app:qhakaza_app@localhost:5433/qhakaza_art_test?schema=public';
+const TEST_DATABASE_OWNER =
+  process.env.E2E_DIRECT_DATABASE_URL ??
+  'postgresql://qhakaza:qhakaza@localhost:5433/qhakaza_art_test?schema=public';
+
+process.env.DATABASE_URL = TEST_DATABASE;
+process.env.DIRECT_DATABASE_URL = TEST_DATABASE_OWNER;
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
   timeout: 60_000,
-  expect: { timeout: 10_000 },
+  // 20s, not the 10s default. Several suites and builds share one machine, and
+  // a first server-action round trip can exceed 10s under that load — which
+  // failed on contention rather than on anything the app did. A genuine hang is
+  // still caught.
+  expect: { timeout: 20_000 },
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
@@ -33,6 +60,8 @@ export default defineConfig({
       NEXTAUTH_URL: baseURL,
       // Build away from `.next`, so a suite run cannot invalidate a dev server.
       NEXT_DIST_DIR: '.next-e2e',
+      DATABASE_URL: TEST_DATABASE,
+      DIRECT_DATABASE_URL: TEST_DATABASE_OWNER,
     },
     timeout: 600_000,
   },

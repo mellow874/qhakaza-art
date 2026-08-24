@@ -2,23 +2,24 @@
 
 import bcrypt from 'bcryptjs';
 
+import { newAccountSchema } from '@qhakaza/shared-auth';
 import { prisma } from '@qhakaza/shared-db';
-
-import { signUpSchema } from '@/lib/validation/user';
 
 export type SignUpResult =
   | { ok: true }
   | { ok: false; error: 'INVALID' | 'TAKEN' | 'UNKNOWN'; fieldErrors?: Record<string, string> };
 
 /**
- * Creates an account.
+ * Creates an **artist** account.
  *
- * `signUpSchema` restricts `role` to ARTIST or COLLECTOR, so ADMIN and ADVISOR
- * cannot be self-assigned — staff are provisioned in the Command Center. That
- * is the whole reason the role is parsed rather than read off the request.
+ * The role is fixed here, not carried in the payload. Vera is the artist site
+ * and makes artists; collectors sign up on the Collector Platform. A role the
+ * browser could choose is a role an attacker could choose, and the previous
+ * version's Artist/Collector selector was also a question no visitor to an
+ * artist site should have to answer.
  */
 export async function signUp(input: unknown): Promise<SignUpResult> {
-  const parsed = signUpSchema.safeParse(input);
+  const parsed = newAccountSchema.safeParse(input);
 
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
@@ -26,7 +27,7 @@ export async function signUp(input: unknown): Promise<SignUpResult> {
     return { ok: false, error: 'INVALID', fieldErrors };
   }
 
-  const { name, email, password, role } = parsed.data;
+  const { name, email, password } = parsed.data;
 
   try {
     const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
@@ -39,7 +40,7 @@ export async function signUp(input: unknown): Promise<SignUpResult> {
     }
 
     await prisma.user.create({
-      data: { name, email, role, passwordHash: await bcrypt.hash(password, 10) },
+      data: { name, email, role: 'ARTIST', passwordHash: await bcrypt.hash(password, 10) },
     });
 
     return { ok: true };

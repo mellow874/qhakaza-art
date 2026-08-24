@@ -151,11 +151,34 @@ describe('LoginForm', () => {
     await waitFor(() => expect(push).toHaveBeenCalled());
   });
 
-  it('offers Google as an alternative', async () => {
-    const { user } = setup();
+  it('offers Google when it is configured', async () => {
+    const { user } = setup({ googleEnabled: true });
 
     await user.click(screen.getByRole('button', { name: /google/i }));
 
     expect(signIn).toHaveBeenCalledWith('google', { redirectTo: '/artist/dashboard' });
+  });
+
+  it('hides Google entirely when it is not configured', () => {
+    // The default. A button that opens a broken OAuth screen is worse than no
+    // button, and the client cannot see GOOGLE_CLIENT_ID to decide for itself —
+    // the page reads it server-side and passes the answer down.
+    setup();
+
+    expect(screen.queryByRole('button', { name: /google/i })).not.toBeInTheDocument();
+    // ...and the divider that introduces it goes too, rather than leaving an
+    // "or" with nothing after it.
+    expect(screen.queryByText(/^or$/i)).not.toBeInTheDocument();
+  });
+
+  it('still signs in with email and password when Google is absent', async () => {
+    const { user } = setup();
+
+    await user.type(screen.getByLabelText(/email/i), 'thandi@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+
+    await waitFor(() => expect(signIn).toHaveBeenCalledTimes(1));
+    expect(signIn.mock.calls[0][0]).toBe('credentials');
   });
 });

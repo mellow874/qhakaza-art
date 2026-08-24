@@ -7,6 +7,14 @@
  */
 
 export { prisma } from './client';
+// The generated namespace, for callers that need Prisma's own input types.
+export { Prisma } from '@prisma/client';
+export * from './env';
 export * from './entities';
+export * from './token';
+export * from './invitation-lifecycle';
 export * from './actor';
 export * from './rls';
+export * from './matching';
+// Test helpers. Exported because the app suites import them across packages.
+export * from './test-visibility';

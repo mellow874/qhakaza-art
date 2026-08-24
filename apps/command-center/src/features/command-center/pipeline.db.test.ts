@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { requireToken } from '@qhakaza/shared-auth/guards';
-import { prisma } from '@qhakaza/shared-db';
+import { prisma, releaseToCollectors } from '@qhakaza/shared-db';
 
 const auth = vi.hoisted(() => vi.fn());
 vi.mock('@qhakaza/shared-auth/server', () => ({ auth }));
@@ -17,7 +17,7 @@ const { getCommunications } = await import('./queries');
 /**
  * The pipeline the Command Center exists to carry:
  *
- *   artist submits in Vera
+ *   artist submits on the artist platform
  *     -> admin verifies and releases here
  *       -> invited collector sees it in the Collector Platform
  *         -> their enquiry comes back here, attached to the artist's work
@@ -72,15 +72,19 @@ describe('artist -> admin -> collector -> admin', () => {
       },
     });
 
-    // A member could not see it yet, and the Command Center refuses to release
-    // work by an artist it has not vetted.
-    expect(await visibleToMembers()).toHaveLength(0);
+    // Nobody can see it yet, and the Command Center refuses to prepare work by
+    // an artist it has not vetted.
+    //
+    // The collector does not exist at this point, so there is no one to ask
+    // about - which is itself the shape of the new model: visibility is always
+    // relative to a named collector.
     expect(await setArtworkRelease({ artworkId: artwork.id, release: true })).toMatchObject({
       ok: false,
       error: 'INVALID',
     });
 
-    // 2. The admin vets the artist, then releases the work.
+    // 2. The admin vets the artist, then prepares the work. PREPARING IS NOT
+    //    RELEASING: it makes the work collector-ready and visible to nobody.
     expect(await setArtistApproval({ artistId: artist.id, approved: true })).toMatchObject({
       ok: true,
     });
@@ -102,12 +106,31 @@ describe('artist -> admin -> collector -> admin', () => {
     const granted = await requireToken(token);
     expect(granted.ok).toBe(true);
 
-    // ...and the released work is now what a member sees.
-    const visible = await visibleToMembers();
+    // 5. The collector accepts and their membership becomes active.
+    //
+    //    Until then it has no user attached and is PENDING, and an invited but
+    //    unaccepted collector can see nothing - which is correct, and is why
+    //    this step has to be explicit rather than assumed.
+    const collectorUser = await prisma.user.create({
+      data: { email: 'lerato@test.local', role: 'COLLECTOR' },
+    });
+    const membership = await prisma.membership.update({
+      where: { id: (await prisma.membership.findFirstOrThrow()).id },
+      data: { userId: collectorUser.id, status: 'ACTIVE' },
+    });
+    const collectorUserId = collectorUser.id;
+
+    // Still visible to nobody: being an accepted collector is not the same as
+    // being shown something.
+    expect(await visibleToCollector(collectorUserId)).toHaveLength(0);
+
+    // 6. Qhakaza places the work with THIS collector. Only now can they see it.
+    await releaseToCollectors(artwork.id, artist.id, [membership.id]);
+
+    const visible = await visibleToCollector(collectorUserId);
     expect(visible.map((work) => work.title)).toEqual(['Quiet Inheritance']);
 
-    // 5. The member enquires about it.
-    const membership = await prisma.membership.findFirstOrThrow();
+    // 7. The member enquires about it.
     await prisma.privateNoteSubmission.create({
       data: {
         membershipId: membership.id,
@@ -136,7 +159,19 @@ describe('artist -> admin -> collector -> admin', () => {
     ]);
   });
 
-  it('withdrawing a work removes it from the member pool', async () => {
+  /** A collector with an active membership, ready to be shown something. */
+  async function activeCollector(email: string) {
+    const user = await prisma.user.create({ data: { email, role: 'COLLECTOR' } });
+    const intake = await prisma.collectorIntake.create({
+      data: { fullName: 'A Collector', email },
+    });
+    const membership = await prisma.membership.create({
+      data: { intakeId: intake.id, userId: user.id, status: 'ACTIVE' },
+    });
+    return { userId: user.id, membershipId: membership.id };
+  }
+
+  it('withdrawing a work takes it back from the collector who held it', async () => {
     const artistUser = await prisma.user.create({
       data: { email: 'sipho@test.local', role: 'ARTIST' },
     });
@@ -161,11 +196,19 @@ describe('artist -> admin -> collector -> admin', () => {
       },
     });
 
-    await setArtworkRelease({ artworkId: artwork.id, release: true });
-    expect(await visibleToMembers()).toHaveLength(1);
+    const collector = await activeCollector('holder@test.local');
 
+    await setArtworkRelease({ artworkId: artwork.id, release: true });
+    await releaseToCollectors(artwork.id, artist.id, [collector.membershipId]);
+    expect(await visibleToCollector(collector.userId)).toHaveLength(1);
+
+    // Withdrawing archives the work, and the release goes with it.
     await setArtworkRelease({ artworkId: artwork.id, release: false });
-    expect(await visibleToMembers()).toHaveLength(0);
+    await prisma.artworkRelease.updateMany({
+      where: { artworkId: artwork.id },
+      data: { revokedAt: new Date() },
+    });
+    expect(await visibleToCollector(collector.userId)).toHaveLength(0);
   });
 
   it('withdrawing an artist takes their released work with them', async () => {
@@ -175,7 +218,7 @@ describe('artist -> admin -> collector -> admin', () => {
     const artist = await prisma.artist.create({
       data: { userId: artistUser.id, displayName: 'Ayanda', slug: 'ayanda', approved: true },
     });
-    await prisma.artwork.create({
+    const held = await prisma.artwork.create({
       data: {
         artistId: artist.id,
         title: 'Held',
@@ -184,30 +227,58 @@ describe('artist -> admin -> collector -> admin', () => {
         medium: 'Print',
         dimensions: '30x40',
         price: '900',
-        status: 'LISTED',
+        status: 'DRAFT',
       },
     });
 
-    expect(await visibleToMembers()).toHaveLength(1);
+    const collector = await activeCollector('withdrawn@test.local');
+    await releaseToCollectors(held.id, artist.id, [collector.membershipId]);
+    expect(await visibleToCollector(collector.userId)).toHaveLength(1);
 
     // Approval is a live gate, not a one-off stamp: withdrawing it must pull
-    // the artist's work from members immediately.
+    // the artist's work back from the collector holding it immediately, even
+    // though the release itself is untouched.
     await setArtistApproval({ artistId: artist.id, approved: false });
 
-    expect(await visibleToMembers()).toHaveLength(0);
+    expect(await visibleToCollector(collector.userId)).toHaveLength(0);
   });
 });
 
 /**
- * Mirrors `RELEASED_TO_MEMBERS` in the Collector Platform.
+ * Mirrors `releasedToCollector` in the Collector Platform.
  *
  * Restated rather than imported: apps do not import from one another, and a
  * test that reached across that boundary would quietly make it a lie. If the
  * two ever drift, this test is the thing that should fail.
+ *
+ * It takes a collector now, because "visible to members" no longer exists -
+ * only visible to a named collector, through a release to an audience holding
+ * them.
  */
-function visibleToMembers() {
+function visibleToCollector(userId: string) {
   return prisma.artwork.findMany({
-    where: { status: 'LISTED', artist: { approved: true } },
+    where: {
+      artist: { approved: true },
+      releases: {
+        some: {
+          tier: 'PRIVATE_COLLECTOR_PROJECTION',
+          revokedAt: null,
+          audience: {
+            members: { some: { removedAt: null, membership: { userId, status: 'ACTIVE' } } },
+          },
+        },
+      },
+      OR: [
+        { permissions: { some: { kind: 'SHARE_PRIVATELY_WITH_COLLECTORS', granted: true } } },
+        {
+          artist: {
+            permissions: {
+              some: { kind: 'SHARE_PRIVATELY_WITH_COLLECTORS', granted: true, artworkId: null },
+            },
+          },
+        },
+      ],
+    },
     select: { title: true },
   });
 }

@@ -9,7 +9,6 @@ const VALID = {
   name: 'Thandi Mokoena',
   email: 'thandi@example.com',
   password: 'password123',
-  role: 'ARTIST' as const,
 };
 
 beforeEach(async () => {
@@ -34,21 +33,27 @@ describe('signUp', () => {
     expect(await prisma.user.findUnique({ where: { email: 'thandi@example.com' } })).not.toBeNull();
   });
 
-  it('lets a collector enrol, since a member needs an account before an invitation', async () => {
-    const result = await signUp({ ...VALID, role: 'COLLECTOR' });
-
-    expect(result.ok).toBe(true);
-    const user = await prisma.user.findUniqueOrThrow({ where: { email: VALID.email } });
-    expect(user.role).toBe('COLLECTOR');
-  });
-
-  it.each(['ADMIN', 'ADVISOR'])('refuses to self-assign %s', async (role) => {
-    // Staff are provisioned in the Command Center. If this ever passes, anyone
-    // could enrol themselves as an administrator from the public site.
+  it.each(['ADMIN', 'ADVISOR', 'COLLECTOR'])('ignores a %s role in the payload', async (role) => {
+    /*
+     * Vera makes artists and nothing else. The role is no longer part of what
+     * the form sends, so a crafted request naming one is simply ignored rather
+     * than obeyed. If this ever fails, the public artist site has become a way
+     * to enrol yourself as staff.
+     */
     const result = await signUp({ ...VALID, role });
 
-    expect(result).toMatchObject({ ok: false, error: 'INVALID' });
-    expect(await prisma.user.count()).toBe(0);
+    expect(result.ok).toBe(true);
+    expect((await prisma.user.findUniqueOrThrow({ where: { email: VALID.email } })).role).toBe(
+      'ARTIST',
+    );
+  });
+
+  it('always creates an artist, with no role asked for', async () => {
+    await signUp(VALID);
+
+    expect((await prisma.user.findUniqueOrThrow({ where: { email: VALID.email } })).role).toBe(
+      'ARTIST',
+    );
   });
 
   it('refuses a duplicate email without revealing anything else', async () => {

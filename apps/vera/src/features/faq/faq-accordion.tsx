@@ -3,7 +3,11 @@
 import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 
-import type { FaqItem } from '@/content/faq';
+/**
+ * Shaped by what the caller has, not by where it came from. The FAQ moved
+ * from a TypeScript file to the database; the component did not need to care.
+ */
+type FaqItem = { question: string; answer: string };
 import { cn } from '@qhakaza/shared-ui';
 
 /**

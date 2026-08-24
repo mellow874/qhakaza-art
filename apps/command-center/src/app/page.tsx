@@ -7,13 +7,15 @@ import { auth } from '@qhakaza/shared-auth/server';
 
 import { AdminCommandCenter } from '@/components/AdminCommandCenter';
 import {
-  getAnalytics,
-  getAuditTrail,
-  getCommunications,
-  getIntakeQueue,
-  getPeople,
-  getVettingQueue,
-} from '@/features/command-center/queries';
+  createAudience,
+  releaseArtwork,
+  revokeRelease,
+  suggestCollectorsFor,
+} from '@/features/audiences/actions';
+import { getPlacementData } from '@/features/audiences/queries';
+import { PlacementPanel } from '@/features/audiences/placement-panel';
+import { getCommandCentreData } from '@/features/command-center/queries';
+import { getEmailStatus } from '@/features/invitations/actions';
 
 export const metadata: Metadata = {
   title: 'Command Center',
@@ -29,7 +31,7 @@ export default async function CommandCenterPage() {
   }
 
   // A signed-in artist or collector who reaches this URL gets nothing — not a
-  // partial page, not an empty shell. The queries below never run for them.
+  // partial page, not an empty shell. The query below never runs for them.
   if (!grant.ok) {
     return (
       <main className="theme-light bg-canvas text-body flex min-h-svh flex-col items-center justify-center px-6 text-center">
@@ -41,29 +43,20 @@ export default async function CommandCenterPage() {
     );
   }
 
-  // The acting member of staff, in the shape the queries and RLS both expect.
   const actor = { userId: grant.userId, role: grant.role as 'ADMIN' | 'ADVISOR' };
 
-  const [vetting, intakes, comms, analytics, people, audit] = await Promise.all([
-    getVettingQueue(actor),
-    getIntakeQueue(actor),
-    getCommunications(actor),
-    getAnalytics(actor),
-    getPeople(actor),
-    getAuditTrail(actor),
-  ]);
+  // One call, one transaction, one declared actor. See queries.ts for why this
+  // is deliberately not seven parallel reads.
+  const [data, placement] = await Promise.all([getCommandCentreData(actor), getPlacementData()]);
+  const email = await getEmailStatus();
 
   return (
     <div className="theme-light bg-canvas text-body min-h-svh">
       <AdminCommandCenter
-        actorRole={grant.role as 'ADMIN' | 'ADVISOR'}
-        actorId={grant.userId}
-        vetting={vetting}
-        intakes={intakes}
-        comms={comms}
-        analytics={analytics}
-        people={people}
-        audit={audit}
+        actorRole={actor.role}
+        actorId={actor.userId}
+        emailConfigured={email.configured}
+        {...data}
       />
     </div>
   );

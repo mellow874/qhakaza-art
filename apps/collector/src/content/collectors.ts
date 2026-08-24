@@ -11,11 +11,38 @@ export const brand = {
   suite: 'Collector Intelligence Suite',
 };
 
+/*
+ * There is deliberately NO link from here into the artist platform.
+ *
+ * A collector must never need to enter the artist operating environment. The
+ * two read the same underlying records but are separate experiences, and the
+ * artist intelligence a member may see is delivered inside this platform
+ * rather than by sending them elsewhere.
+ *
+ * The `VERA_URL` export that used to live here has been removed. It carried
+ * the old naming collision too: "Vera" is the artist platform's former name,
+ * while VERA now means only the evidence and decision layer.
+ */
+
+/**
+ * The navigation labels are the design's. The destinations are the pages that
+ * actually exist.
+ *
+ * The design named four nav items but only supplied designs for two of the
+ * pages behind them, so `/collectors/suite` and `/collectors/pricing` were
+ * links to nothing — a 404 from the site's own header. Rather than invent two
+ * pages, each label now points at the page that already carries its content:
+ *
+ *   Suite   → the landing page, which is the description of the suite
+ *   Pricing → the membership page, which is where the $10,000/year sits
+ *
+ * If dedicated pages are designed later, these are two href changes.
+ */
 export const NAV = [
-  { href: '/collectors/suite', label: 'Suite' },
+  { href: '/collectors', label: 'Suite' },
   { href: '/collectors/about', label: 'About' },
   { href: '/collectors/membership', label: 'Membership' },
-  { href: '/collectors/pricing', label: 'Pricing' },
+  { href: '/collectors/membership', label: 'Pricing' },
 ] as const;
 
 export const APPLY_CTA = { href: '/collectors/apply', label: 'Apply' };
@@ -27,7 +54,9 @@ export const hero = {
   body: 'A private collector environment where African contemporary art is experienced, understood, and acquired through trusted access to carefully vetted emerging artists, verified records, clear pricing context, market intelligence, and discreet, invitation-only experiences',
   note: 'For those who prefer an intelligent, culturally rooted entry into African art collecting',
   primaryCta: { label: 'Begin collector intake', href: '/collectors/apply' },
-  secondaryCta: { label: 'Explore the suite', href: '/collectors/suite' },
+  // Down to what the suite offers, on this same page — there is no separate
+  // /collectors/suite, and this button used to lead to a 404.
+  secondaryCta: { label: 'Explore the suite', href: '#what-you-receive' },
   membershipNote:
     'Annual membership for serious collectors seeking private access, trusted context, and premium acquisition pathways',
   imageAlt:
@@ -143,9 +172,12 @@ export const footer = {
     {
       heading: 'Suite',
       links: [
-        { href: 'https://qhakaza-art-vera.vercel.app/', label: 'Artist Intelligence' },
-        { href: '/collectors/suite', label: 'Artwork Intelligence' },
-        { href: '/collectors/suite', label: 'Intelligence' },
+        // Stays on this site. Artist intelligence is delivered to a member
+        // inside the collector platform, never by sending them across to the
+        // artist environment.
+        { href: '/collectors#intelligence-preview', label: 'Artist Intelligence' },
+        { href: '/collectors#intelligence-preview', label: 'Artwork Intelligence' },
+        { href: '/collectors#what-you-receive', label: 'Intelligence' },
         { href: '/collectors/request', label: 'Request Access' },
       ],
     },
@@ -154,8 +186,11 @@ export const footer = {
       links: [
         { href: '/collectors/about', label: 'About Qhakaza' },
         { href: '/collectors', label: 'Collector Intelligence' },
-        { href: '/collectors/experiences', label: 'Private Experiences' },
-        { href: '/artists', label: 'Artists' },
+        { href: '/collectors#featured-experience', label: 'Private Experiences' },
+        // "Artists" is deliberately absent. It pointed at `/artists`, which is
+        // an artist-platform route and 404s here — and the artists a member sees are
+        // behind `/private`, so there is nothing public to link to.
+        { href: '/collectors/methodology', label: 'Methodology' },
       ],
     },
     {
@@ -280,6 +315,15 @@ export const apply = {
   received: {
     title: 'Your intake has been received',
     body: 'Qhakaza has your details. The verification step follows, and we will be in touch to arrange it.',
+    // The Private Note is offered here because this is the moment it is for:
+    // the intake captures who someone is, the note captures what they are
+    // drawn to, and everything prepared for them afterwards is shaped by it.
+    // Optional, and framed as such — it is a note, not another form to clear.
+    nextStep: {
+      label: 'Write your Private Note',
+      href: '/collectors/private-note',
+      body: 'If you have a few more quiet minutes, tell us what you are drawn to. It shapes what we prepare for you.',
+    },
   },
   error: 'We could not save your application. Please try again.',
 };
@@ -294,7 +338,7 @@ export const membership = {
     label: 'Annual membership consideration',
     note: 'For collectors seeking a serious, guided route into African contemporary art.',
   },
-  cta: { label: 'Request membership consideration', href: '/collectors/apply' },
+  cta: { label: 'Request membership consideration', href: '/collectors/membership-consideration' },
   rhythmNote: {
     title: "The club is built around the collector's time",
     body: 'The calendar is kept intentionally light. What matters is not frequency, but the quality of the moments, the access around them, and the continuity that follows',
@@ -326,7 +370,10 @@ export const membership = {
     eyebrow: 'Request membership consideration',
     title: 'The route begins with a conversation, not a checkout.',
     body: 'Begin with a short collector intake. It takes a few quiet minutes and shapes everything that follows.',
-    cta: { label: 'Request membership consideration', href: '/collectors/apply' },
+    cta: {
+      label: 'Request membership consideration',
+      href: '/collectors/membership-consideration',
+    },
   },
 };
 
@@ -360,7 +407,7 @@ export const methodology = {
     eyebrow: 'In essence',
     body: 'A private membership that offers collectors a composed way into African contemporary art, translating the work of artists, curators, galleries and advisors into clear intelligence, quiet preparation and well-timed access',
   },
-  cta: { label: 'Apply for membership', href: '/collectors/apply' },
+  cta: { label: 'Apply for membership', href: '/collectors/membership-consideration' },
 };
 
 export const request = {

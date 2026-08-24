@@ -22,7 +22,11 @@ export default async function LoginPage({
     <NarrowPage className="max-w-md">
       <PageHeader eyebrow="Welcome back" title="Sign in" className="mb-10" />
 
-      <LoginForm callbackUrl={safeCallbackUrl} />
+      {/* Server-side: only offer Google when it is actually configured. */}
+      <LoginForm
+        callbackUrl={safeCallbackUrl}
+        googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID)}
+      />
 
       <p className="text-muted mt-10 text-sm">
         New here?{' '}

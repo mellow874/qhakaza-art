@@ -1,24 +1,17 @@
 import { z } from 'zod';
 
-/** Roles a visitor may choose at sign-up. ADMIN is provisioned out-of-band only. */
-export const SIGNUP_ROLES = ['ARTIST', 'COLLECTOR'] as const;
+/*
+ * `signUpSchema` and `SIGNUP_ROLES` were removed here.
+ *
+ * Vera creates artists and nothing else, so the role is fixed in the server
+ * action rather than chosen in the payload. Account fields now come from
+ * `newAccountSchema` in @qhakaza/shared-auth, which both sites share.
+ */
 
 const emailSchema = z
   .string()
   .transform((value) => value.trim().toLowerCase())
   .pipe(z.email('Enter a valid email address'));
-
-const passwordSchema = z
-  .string()
-  .min(8, 'Password must be at least 8 characters')
-  .max(200, 'Password is too long');
-
-export const signUpSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(120),
-  email: emailSchema,
-  password: passwordSchema,
-  role: z.enum(SIGNUP_ROLES).default('COLLECTOR'),
-});
 
 // `credentialsSchema` lives in @qhakaza/shared-auth: all three apps sign in
 // against the same accounts, so one definition serves client and server alike.
@@ -44,6 +37,5 @@ export const contactMessageSchema = z.object({
 
 export type ContactMessageInput = z.infer<typeof contactMessageSchema>;
 
-export type SignUpInput = z.infer<typeof signUpSchema>;
 export type ArtistProfileInput = z.infer<typeof artistProfileSchema>;
 export type CollectorProfileInput = z.infer<typeof collectorProfileSchema>;

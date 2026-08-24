@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 
 import { CtaBand } from '@/components/cta-band';
-import { cta, emptyState, faqs, hero } from '@/content/faq';
+import { cta, emptyState, hero } from '@/content/faq';
+import { DemoNotice } from '@/features/content/demo-notice';
+import { getFaq } from '@/features/content/queries';
 import { FaqAccordion } from '@/features/faq/faq-accordion';
 
 export const metadata: Metadata = {
@@ -13,7 +15,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function FaqPage() {
+// Read fresh: staff edit the FAQ from the Command Center and expect to see the
+// change, not a page baked at build time.
+export const dynamic = 'force-dynamic';
+
+export default async function FaqPage() {
+  const categories = await getFaq();
+  const items = categories.flatMap((category) =>
+    category.items.map((item) => ({ ...item, category: category.label })),
+  );
+  const anyDemo = items.some((item) => item.isDemo);
+
   return (
     <main className="flex flex-col">
       <section className="border-line/60 border-b">
@@ -24,12 +36,14 @@ export default function FaqPage() {
       </section>
 
       <div className="mx-auto w-full max-w-4xl px-6 py-20 sm:py-24">
-        {faqs.length === 0 ? (
+        {anyDemo && <DemoNotice what="The questions and answers" />}
+
+        {items.length === 0 ? (
           <p className="text-muted border-line rounded-(--radius-soft) border border-dashed p-16 text-center text-sm">
             {emptyState}
           </p>
         ) : (
-          <FaqAccordion items={faqs} />
+          <FaqAccordion items={items} />
         )}
       </div>
 

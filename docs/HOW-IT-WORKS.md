@@ -7,20 +7,21 @@ the `packages/` layer.
 ```
               ┌──────────────────────────────────────────────┐
               │            ONE POSTGRES DATABASE             │
-              │   13 core entities, Row-Level Security on    │
+              │   51 entities, Row-Level Security on    │
               └───────▲──────────────▲──────────────▲────────┘
                       │              │              │
         @qhakaza/shared-db  ·  shared-auth  ·  shared-ui
                       │              │              │
         ┌─────────────┴───┐  ┌───────┴──────┐  ┌────┴──────────────┐
-        │      VERA       │  │  COLLECTOR   │  │  COMMAND CENTER   │
-        │   public site   │  │   platform   │  │    staff only     │
+        │  ARTIST         │  │  COLLECTOR   │  │  COMMAND CENTER   │
+        │  INTELLIGENCE   │  │   platform   │  │    staff only     │
+        │  PLATFORM       │  │              │  │                   │
         │    port 3001    │  │  port 3002   │  │    port 3003      │
         └─────────────────┘  └──────────────┘  └───────────────────┘
-             artists            collectors        admin + advisor
+             artists            collectors    admin + advisor + analyst
 ```
 
-There is **no link between Vera and the Collector Platform**. They are separate
+There is **no link between the Artist Intelligence Platform and the Collector Platform**. They are separate
 websites for separate audiences. The only thing connecting them is the Command
 Center, and it connects them through data, not navigation.
 
@@ -28,12 +29,12 @@ Center, and it connects them through data, not navigation.
 
 ## The three apps
 
-### Vera — `localhost:3001`
+### the Artist Intelligence Platform — `localhost:3001`
 
 The public, indexable artist website. Marketing pages, sign-in, sign-up, artist
 onboarding.
 
-Vera can read released artists and artworks, and write its own artist's profile.
+The Artist Intelligence Platform can read released artists and artworks, and write its own artist's profile.
 It **cannot touch a single collector table** — not by convention, but because the
 database refuses.
 
@@ -63,7 +64,7 @@ Never indexed. Every action writes an audit record.
 This is the loop the whole system exists to carry:
 
 ```
- 1. ARTIST          signs up on Vera, builds a profile, submits work
+ 1. ARTIST          signs up on the Artist Intelligence Platform, builds a profile, submits work
                       ↓  invisible to everyone — unapproved, unreleased
  2. ADMIN/ADVISOR   approves the artist in the Command Center
                     releases the work to LISTED
@@ -116,7 +117,7 @@ npm run command-center  # → http://localhost:3003
 
 ### The five-minute demo
 
-1. **Vera** (`:3001`) — browse the public site. Sign in as `thandi@qhakaza.art`,
+1. **the Artist Intelligence Platform** (`:3001`) — browse the public site. Sign in as `thandi@qhakaza.art`,
    or create a new account at `/signup`.
 2. **Collector shell** (`:3002/collectors`) — read the membership pages, then
    submit `/collectors/apply`.
@@ -161,7 +162,7 @@ Full detail, including the policy matrix: [RLS.md](RLS.md).
 
 ## Who can do what
 
-|           | Vera                      | `/collectors` | `/private/<token>`        | Command Center        |
+|           | The Artist Intelligence Platform                      | `/collectors` | `/private/<token>`        | Command Center        |
 | --------- | ------------------------- | ------------- | ------------------------- | --------------------- |
 | Anonymous | ✅ browse, apply, sign up | ✅            | ❌                        | ❌                    |
 | Artist    | ✅ own profile and work   | ✅            | ❌                        | ❌                    |

@@ -21,7 +21,7 @@
  *
  *  3. The current actor reaches Postgres through two transaction-local
  *     settings, applied by `withActor()`:
- *         qhakaza.role     admin | advisor | artist | collector | system
+ *         qhakaza.role     admin | advisor | analyst | artist | collector | system
  *         qhakaza.user_id  the acting user's id
  *     With neither set, `current_setting(..., true)` returns NULL and the actor
  *     is treated as anonymous. Anything a policy does not explicitly grant to
@@ -35,6 +35,12 @@ import { CORE_ENTITIES, type CoreEntity } from './entities';
 export const RLS_ROLES = [
   'admin',
   'advisor',
+  /**
+   * Internal Analyst. Confirmed by Qhakaza as a FIFTH role, distinct from
+   * advisor: analysts work Cases, evidence and research, but have no part in
+   * concierge work and cannot change what anyone is allowed to do.
+   */
+  'analyst',
   'artist',
   'collector',
   /** Anonymous. The public artist site and the collector membership shell. */
@@ -53,12 +59,17 @@ export type RlsRole = (typeof RLS_ROLES)[number];
 export type Operation = 'select' | 'insert' | 'update' | 'delete';
 
 /**
- * `true`  — unconditional.
- * `'own'` — only rows belonging to the actor (see OWNERSHIP).
- * `'released'` — only vetted, published rows (see RELEASED).
- * absent  — denied.
+ * `true`       — unconditional.
+ * `'own'`      — only rows belonging to the actor (see OWNERSHIP).
+ * `'released'` — only what is authorised for PUBLIC view (see RELEASED).
+ * `'audience'` — only what has been released to an audience this actor belongs
+ *                to (see AUDIENCE_RELEASED). Distinct from `'released'` on
+ *                purpose: "the public may see it" and "this collector may see
+ *                it" were previously the same predicate, which is how every
+ *                collector ended up seeing the public catalogue.
+ * absent       — denied.
  */
-export type Grant = true | 'own' | 'released';
+export type Grant = true | 'own' | 'released' | 'audience';
 
 export type EntityPolicy = Partial<Record<Operation, Partial<Record<RlsRole, Grant>>>>;
 
@@ -71,16 +82,46 @@ export type EntityPolicy = Partial<Record<Operation, Partial<Record<RlsRole, Gra
  */
 export const OWNERSHIP: Partial<Record<CoreEntity, string>> = {
   Artist: `"userId" = %UID%`,
+  ArtistPermission: `"artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)`,
   Artwork: `"artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)`,
   Membership: `"userId" = %UID%`,
   PrivateNoteSubmission: `"membershipId" IN (SELECT "id" FROM "Membership" WHERE "userId" = %UID%)`,
 };
 
-/** What "vetted and released" means, per entity. Never raw submissions. */
+/**
+ * What a given actor may see because it was RELEASED TO AN AUDIENCE they belong
+ * to. Keyed by entity, same shape as OWNERSHIP and RELEASED.
+ */
+export const AUDIENCE_RELEASED: Partial<Record<CoreEntity, string>> = {
+  /*
+   * What a COLLECTOR may see of an artwork.
+   *
+   * Not "approved", not "published" - released, to an audience this collector
+   * belongs to, with the artist's permission to share privately. Same function
+   * reasoning as above: a collector must not be able to read Qhakaza's
+   * distribution tables, so the check runs inside a definer function.
+   */
+  Artwork: `qhakaza_collector_sees_artwork("Artwork"."id", %UID%)`,
+};
+
+/** What "authorised for public view" means, per entity. Never raw submissions. */
 export const RELEASED: Partial<Record<CoreEntity, string>> = {
   Artist: `"approved" = true`,
-  Artwork: `"status" = 'LISTED' AND "artistId" IN (SELECT "id" FROM "Artist" WHERE "approved" = true)`,
+  /*
+   * PUBLIC means EDITORIAL ONLY, and it is deliberately hard to satisfy:
+   * approved artist, PUBLIC_EDITORIAL status, an un-revoked editorial release,
+   * and the artist's PUBLISH_PUBLICLY permission. Approval alone gets nowhere
+   * near it - before, `status = 'PUBLISHED'` was the whole test.
+   *
+   * Delegated to a SECURITY DEFINER function because RLS applies inside a
+   * policy's own subqueries, and the tables this must read are ones the public
+   * cannot read. See 20260818000300_visibility_functions.
+   */
+  Artwork: `qhakaza_public_sees_artwork("Artwork"."id")`,
   NewsArticle: `"status" = 'PUBLISHED'`,
+  FaqItem: `"published" = true`,
+  Briefing: `"status" = 'PUBLISHED'`,
+  LegalDocumentVersion: `"status" = 'PUBLISHED'`,
 };
 
 /**
@@ -107,11 +148,23 @@ export const RLS_MATRIX = {
     delete: { admin: true },
   },
   Artwork: {
+    /*
+     * THE CHANGE THIS PHASE EXISTS FOR.
+     *
+     * `collector` was 'released' - the same predicate as `public`, so every
+     * collector saw exactly the public catalogue. It is now 'audience': a
+     * release must exist, to an audience holding this collector, with the
+     * artist's permission to share privately.
+     *
+     * `public` remains 'released', but RELEASED itself now means editorial
+     * authorisation rather than "approved".
+     */
     select: {
       admin: true,
       advisor: true,
+      analyst: true,
       artist: 'own',
-      collector: 'released',
+      collector: 'audience',
       public: 'released',
     },
     insert: { admin: true, artist: 'own' },
@@ -147,6 +200,369 @@ export const RLS_MATRIX = {
     select: { admin: true, advisor: true, system: true },
     insert: { admin: true, advisor: true },
     update: { admin: true, advisor: true },
+    delete: {},
+  },
+  InvitationRecipientType: {
+    // Reference data, not personal data. Every actor may read it -- `system`
+    // needs it while accepting an invitation, before a session exists, to learn
+    // which role the invitation grants. Only an admin may change the list.
+    select: { admin: true, advisor: true, artist: true, collector: true, system: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  InternalNote: {
+    // Staff only, with no policy at all for artists or collectors -- the
+    // strongest form of "internal". The brief requires this to be enforced by
+    // RLS rather than by the UI, so there is deliberately no row here that
+    // could be widened by a careless change to a screen.
+    select: { admin: true, advisor: true },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  InternalNoteRevision: {
+    // Append-only history. Nobody edits or deletes a revision, including staff:
+    // a revision log that can be rewritten records nothing.
+    select: { admin: true, advisor: true },
+    insert: { admin: true, advisor: true },
+    update: {},
+    delete: {},
+  },
+  ArtworkReviewRequest: {
+    // The artist MUST be able to read this -- being told "returned for
+    // information" without the question is useless. They cannot write one.
+    select: { admin: true, advisor: true, artist: true },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  // ---------------------------------------------------------------------
+  // VERA
+  //
+  // Staff only, throughout. There is deliberately no artist, collector or
+  // public row anywhere below: section 22 names internal analysis and
+  // unpublished evidence as things that must never reach client-facing
+  // permissions, and the strongest way to guarantee that is to grant nothing.
+  //
+  // ANALYST is granted alongside ADMIN and ADVISOR on the working tables, and
+  // withheld from the taxonomy: an analyst uses the categories, an admin
+  // decides what the categories are.
+  // ---------------------------------------------------------------------
+  EvidenceType: {
+    // Read by anyone doing the work; changed only by an admin. Taxonomy drift
+    // mid-Case would make two Cases incomparable.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  ReliabilityLevel: {
+    // Read by anyone doing the work; changed only by an admin. Taxonomy drift
+    // mid-Case would make two Cases incomparable.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  GapType: {
+    // Read by anyone doing the work; changed only by an admin. Taxonomy drift
+    // mid-Case would make two Cases incomparable.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  SpecialistCategory: {
+    // Read by anyone doing the work; changed only by an admin. Taxonomy drift
+    // mid-Case would make two Cases incomparable.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  PartyRole: {
+    // Read by anyone doing the work; changed only by an admin. Taxonomy drift
+    // mid-Case would make two Cases incomparable.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  Party: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Exhibition: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Publication: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  ProvenanceTransaction: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Source: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Evidence: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Claim: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Assessment: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Gap: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  Contradiction: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  SpecialistEscalation: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  CaseArtwork: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  CaseEvidence: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  EvidenceClaim: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  ClaimAssessment: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  ArtworkParty: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  CaseParty: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  EvidenceSource: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  ArtworkExhibition: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  ArtworkPublication: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  MethodologyVersion: {
+    // An analyst applies a methodology; only an admin issues one. A method that
+    // anyone could revise is not a method anyone can be held to.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  IntelligenceCase: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: {},
+  },
+  CaseVersion: {
+    // INSERT ONLY, AND NO UPDATE FOR ANYONE -- including admins.
+    //
+    // This is where "a revised Case never destroys a previously issued
+    // version" stops being a promise and becomes a database constraint. A
+    // revision inserts a new row; nothing can rewrite what was already issued.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: {},
+    delete: {},
+  },
+  // --- Content surfaces --------------------------------------------------
+  // Read by everyone, written only by staff. The `released` grant means a
+  // visitor sees PUBLISHED rows and nothing else, so an unfinished Briefing or
+  // an unpublished Terms revision cannot leak by guessing a URL.
+  FaqCategory: {
+    select: { admin: true, advisor: true, analyst: true, artist: true, collector: true, public: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  FaqItem: {
+    select: {
+      admin: true,
+      advisor: true,
+      analyst: true,
+      artist: 'released',
+      collector: 'released',
+      public: 'released',
+    },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  Briefing: {
+    select: {
+      admin: true,
+      advisor: true,
+      analyst: true,
+      artist: 'released',
+      collector: 'released',
+      public: 'released',
+    },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  BriefingRelation: {
+    select: { admin: true, advisor: true, analyst: true, artist: true, collector: true, public: true },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  LegalDocumentVersion: {
+    // No delete for anyone. You must be able to show what someone agreed to on
+    // the day they agreed to it.
+    select: {
+      admin: true,
+      advisor: true,
+      analyst: true,
+      artist: 'released',
+      collector: 'released',
+      public: 'released',
+    },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  // --- Visibility and release --------------------------------------------
+  // Staff decide who sees what. No collector, artist or public grant anywhere:
+  // a collector must not be able to read the shape of Qhakaza's distribution,
+  // only receive what it produces.
+  AudienceType: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  Audience: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  AudienceMember: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  ArtworkRelease: {
+    // Never deleted. Who could see what, and when, is provenance and feeds
+    // VERA. Withdrawing sets revokedAt, which is an UPDATE.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  ArtistPermission: {
+    // An artist may READ what they have granted - being unable to see your own
+    // consent record would be indefensible - but never write it here. Consent
+    // is recorded through an action that captures how it was given.
+    select: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  CollectorProfile: {
+    /*
+     * Staff only, and NOT the collector themselves.
+     *
+     * This is Qhakaza's reading of a person - confidence gaps, budget logic,
+     * what an advisor wants remembered. A collector seeing the file kept on
+     * them would change what they say in the Private Note, which is the one
+     * thing that must stay candid. Section 6's collector-facing Collecting
+     * Direction is a separate, deliberately curated projection.
+     */
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, system: true },
+    update: { admin: true, advisor: true, system: true },
+    delete: {},
+  },
+  MatchSuggestion: {
+    // Internal working material. A collector must never learn they were
+    // considered for a work and passed over.
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  MediaAsset: {
+    // Artists write their own uploads and read them back. Staff see everything.
+    // Collectors are NOT granted a read: released artwork images are served
+    // through the artwork record, and a collector who could read this table
+    // directly could enumerate evidence documents by changing an id.
+    select: { admin: true, advisor: true, artist: true },
+    insert: { admin: true, advisor: true, artist: true },
+    update: { admin: true, advisor: true, artist: true },
+    // Never. Section 23 requires files to stay retrievable; withdrawal is a
+    // status change, not a delete.
     delete: {},
   },
   ActivationAttempt: {
@@ -199,8 +615,13 @@ export const RLS_MATRIX = {
   AuditLog: {
     // Append-only by policy: NO role gets UPDATE or DELETE, including admin.
     // An audit trail an administrator can rewrite is not an audit trail.
+    //
+    // `analyst` must be able to INSERT. Every audited action writes its log row
+    // in the same transaction as the change, so a role that cannot write here
+    // cannot act at all -- adding ANALYST without this line would have made
+    // every analyst action fail at the audit step.
     select: { admin: true },
-    insert: { admin: true, advisor: true },
+    insert: { admin: true, advisor: true, analyst: true },
     update: {},
     delete: {},
   },
@@ -255,7 +676,12 @@ export function policyExpression(entity: CoreEntity, operation: Operation): stri
       continue;
     }
 
-    const fragment = grant === 'own' ? OWNERSHIP[entity] : RELEASED[entity];
+    const fragment =
+      grant === 'own'
+        ? OWNERSHIP[entity]
+        : grant === 'audience'
+          ? AUDIENCE_RELEASED[entity]
+          : RELEASED[entity];
     if (!fragment) {
       throw new Error(
         `${entity}.${operation} grants '${grant}' to ${role} but no ${grant} predicate is defined`,

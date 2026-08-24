@@ -1,26 +1,59 @@
 import { describe, expect, it } from 'vitest';
 
-import { credentialsSchema } from './credentials';
+import { credentialsSchema, newAccountSchema } from './credentials';
+
+describe('newAccountSchema', () => {
+  const valid = {
+    name: 'Thandi Mokoena',
+    email: 'thandi@example.com',
+    password: 'correct-horse-9',
+  };
+
+  it('accepts a valid account', () => {
+    expect(newAccountSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('lowercases and trims the email, so one person is one account', () => {
+    expect(newAccountSchema.parse({ ...valid, email: '  Thandi@Example.COM ' }).email).toBe(
+      'thandi@example.com',
+    );
+  });
+
+  it.each([
+    ['a malformed email', { email: 'not-an-email' }],
+    ['a short password', { password: 'short7!' }],
+    ['no name', { name: '   ' }],
+  ])('rejects %s', (_label, override) => {
+    expect(newAccountSchema.safeParse({ ...valid, ...override }).success).toBe(false);
+  });
+
+  it('carries no role at all, so none can be chosen by the browser', () => {
+    /*
+     * This replaced a schema with a `role` field the client sent. Each site now
+     * fixes the role server-side — Vera makes artists, the Collector Platform
+     * makes collectors — so a crafted payload has nothing to aim at.
+     */
+    const parsed = newAccountSchema.parse({ ...valid, role: 'ADMIN' });
+
+    expect(parsed).not.toHaveProperty('role');
+    expect(Object.keys(parsed).sort()).toEqual(['email', 'name', 'password']);
+  });
+});
 
 describe('credentialsSchema', () => {
   it('accepts an email and password pair', () => {
-    expect(credentialsSchema.safeParse({ email: 'a@b.com', password: 'password1' }).success).toBe(
-      true,
-    );
+    expect(
+      credentialsSchema.safeParse({ email: 'a@b.com', password: 'password1' }).success,
+    ).toBe(true);
   });
 
   it('rejects a missing password', () => {
     expect(credentialsSchema.safeParse({ email: 'a@b.com' }).success).toBe(false);
   });
 
-  it('normalises the email, so one account is one identity', () => {
-    const result = credentialsSchema.parse({ email: '  A@B.COM ', password: 'x' });
-    expect(result.email).toBe('a@b.com');
-  });
-
-  it('does not impose password strength rules on a sign-in attempt', () => {
-    // Strength belongs at sign-up. Enforcing it here would leak the rules to
-    // anyone probing the form, and lock out accounts made under older ones.
+  it('does not impose password rules on sign-in', () => {
+    // Strength rules here would leak them to anyone probing the login form, and
+    // would lock out accounts created under older rules.
     expect(credentialsSchema.safeParse({ email: 'a@b.com', password: 'x' }).success).toBe(true);
   });
 });

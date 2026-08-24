@@ -21,7 +21,13 @@ import { prisma } from './client';
  * it never silently keeps it.
  */
 
-export type ActorRole = 'admin' | 'advisor' | 'artist' | 'collector' | 'system';
+/**
+ * Kept in step with `RLS_ROLES` in rls.ts, which is the list the policies are
+ * generated from. A role here that the policies do not know is granted nothing,
+ * which fails safe but confusingly; a role the policies know and this does not
+ * cannot be declared at all.
+ */
+export type ActorRole = 'admin' | 'advisor' | 'analyst' | 'artist' | 'collector' | 'system';
 
 export type Actor = {
   role: ActorRole;
@@ -41,14 +47,38 @@ export async function setActor(tx: Prisma.TransactionClient, actor: Actor): Prom
   await tx.$executeRaw`SELECT set_config('qhakaza.role', ${actor.role}, true), set_config('qhakaza.user_id', ${actor.userId ?? ''}, true)`;
 }
 
+/**
+ * How long one actor-scoped transaction may take.
+ *
+ * Prisma's defaults are 5s to run and 2s to acquire a connection. Those are
+ * sensible for a transaction that writes one row, and wrong for this pattern:
+ * the actor is declared with `set_config(..., true)`, which is scoped to the
+ * TRANSACTION, so every read a page needs must happen inside a single one.
+ * A console that loads twenty lists is therefore one long transaction by
+ * design, not by accident.
+ *
+ * The database is also a managed instance in another region: each round trip
+ * costs real milliseconds, and twenty of them stack up well past five seconds
+ * without anything being wrong.
+ *
+ * 20s still catches a genuine hang - it is a ceiling, not a target. The
+ * Command Center's own page ran into the 5s default the moment the dashboard
+ * counts were added, which is what prompted this.
+ */
+const TRANSACTION_TIMEOUT_MS = 20_000;
+const TRANSACTION_MAX_WAIT_MS = 10_000;
+
 export async function withActor<T>(
   actor: Actor,
   run: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
-  return prisma.$transaction(async (tx) => {
-    await setActor(tx, actor);
-    return run(tx);
-  });
+  return prisma.$transaction(
+    async (tx) => {
+      await setActor(tx, actor);
+      return run(tx);
+    },
+    { timeout: TRANSACTION_TIMEOUT_MS, maxWait: TRANSACTION_MAX_WAIT_MS },
+  );
 }
 
 /**

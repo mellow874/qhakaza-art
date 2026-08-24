@@ -4,30 +4,22 @@ import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
-import { Button, Field, cn } from '@qhakaza/shared-ui';
-
-import { SIGNUP_ROLES, signUpSchema } from '@/lib/validation/user';
+import { newAccountSchema } from '@qhakaza/shared-auth';
+import { Button, Field } from '@qhakaza/shared-ui';
 
 type Result = { ok: boolean; fieldErrors?: Record<string, string> };
-type Role = (typeof SIGNUP_ROLES)[number];
 
-/** What each role gets, in the words the site uses elsewhere. */
-const ROLE_COPY: Record<Role, { label: string; blurb: string }> = {
-  ARTIST: {
-    label: 'Artist',
-    blurb: 'Build a profile, submit work, and follow it through vetting.',
-  },
-  COLLECTOR: {
-    label: 'Collector',
-    blurb: 'For members joining the Collector Intelligence Suite by invitation.',
-  },
-};
-
+/**
+ * Creating an artist account.
+ *
+ * There is no "what are you joining as" step: this is the artist site, so
+ * everyone who signs up here is an artist. The role is set server-side and is
+ * not part of what the form sends.
+ */
 export function SignUpForm({ onSubmit }: { onSubmit: (values: unknown) => Promise<Result> }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<Role>('ARTIST');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -42,7 +34,7 @@ export function SignUpForm({ onSubmit }: { onSubmit: (values: unknown) => Promis
     setFormError(null);
 
     // The same schema the server action runs, so the two cannot disagree.
-    const parsed = signUpSchema.safeParse({ name, email, password, role });
+    const parsed = newAccountSchema.safeParse({ name, email, password });
 
     if (!parsed.success) {
       const next: Record<string, string> = {};
@@ -64,8 +56,8 @@ export function SignUpForm({ onSubmit }: { onSubmit: (values: unknown) => Promis
         return;
       }
 
-      // Sign in with the credentials just used, so the visitor is not made to
-      // type them again immediately after proving they know them.
+      // Sign in with the credentials just used, so nobody is made to type them
+      // again immediately after proving they know them.
       const signedIn = await signIn('credentials', {
         email: parsed.data.email,
         password: parsed.data.password,
@@ -78,7 +70,8 @@ export function SignUpForm({ onSubmit }: { onSubmit: (values: unknown) => Promis
         return;
       }
 
-      router.push(parsed.data.role === 'ARTIST' ? '/artist/onboarding' : '/');
+      // Straight into building the profile — the next thing they came to do.
+      router.push('/artist/onboarding');
       router.refresh();
     } catch {
       setFormError('We could not create your account. Please try again.');
@@ -98,7 +91,7 @@ export function SignUpForm({ onSubmit }: { onSubmit: (values: unknown) => Promis
             autoComplete="name"
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="As it should appear"
+            placeholder="As it should appear on your profile"
           />
         )}
       </Field>
@@ -128,47 +121,6 @@ export function SignUpForm({ onSubmit }: { onSubmit: (values: unknown) => Promis
         )}
       </Field>
 
-      {/* Radios, not a select: two options with an explanation each, and the
-          choice changes where the visitor lands. ADMIN and ADVISOR are absent
-          by design — staff accounts are provisioned in the Command Center. */}
-      <fieldset className="flex flex-col gap-3">
-        <legend className="text-heading text-sm font-medium">I am joining as</legend>
-
-        <div className="mt-1 grid gap-3 sm:grid-cols-2">
-          {SIGNUP_ROLES.map((option) => {
-            const selected = role === option;
-            return (
-              <label
-                key={option}
-                className={cn(
-                  'focus-within:border-accent flex cursor-pointer flex-col gap-1 border p-4 transition-colors',
-                  selected
-                    ? 'border-accent bg-accent-soft/40'
-                    : 'border-line hover:border-accent/60',
-                )}
-              >
-                <span className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="role"
-                    value={option}
-                    checked={selected}
-                    onChange={() => setRole(option)}
-                    className="accent-[var(--color-accent)]"
-                  />
-                  <span className="text-heading text-sm font-medium">
-                    {ROLE_COPY[option].label}
-                  </span>
-                </span>
-                <span className="text-muted pl-6 text-xs leading-relaxed">
-                  {ROLE_COPY[option].blurb}
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      </fieldset>
-
       {formError && (
         <p role="alert" className="border-danger/30 bg-danger/5 text-danger border p-4 text-sm">
           {formError}
@@ -176,7 +128,7 @@ export function SignUpForm({ onSubmit }: { onSubmit: (values: unknown) => Promis
       )}
 
       <Button type="submit" size="lg" disabled={pending}>
-        {pending ? 'Creating your account…' : 'Create account'}
+        {pending ? 'Creating your account…' : 'Create artist account'}
       </Button>
     </form>
   );

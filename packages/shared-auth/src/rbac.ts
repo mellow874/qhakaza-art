@@ -7,15 +7,26 @@
  * re-checks authorisation against the session on the server.
  */
 
-export const ROLES = ['ARTIST', 'COLLECTOR', 'ADMIN', 'ADVISOR'] as const;
+export const ROLES = ['ARTIST', 'COLLECTOR', 'ADMIN', 'ADVISOR', 'ANALYST'] as const;
 
 export type Role = (typeof ROLES)[number];
 
 /**
- * Roles permitted inside the Command Center. Advisors run matching and
- * concierge work; admins additionally manage permissions and platform data.
+ * Roles permitted inside the Command Center.
+ *
+ * Advisors run matching and concierge work; admins additionally manage
+ * permissions and platform data; analysts work Cases, evidence and research.
+ *
+ * ANALYST is a FIFTH role, confirmed by Qhakaza as distinct from ADVISOR. It is
+ * admitted to the Command Center because that is where VERA lives, but the RLS
+ * matrix grants it nothing on the collector tables -- an analyst reading a
+ * Case must not thereby be able to read someone's financial profile.
  */
-export const COMMAND_CENTER_ROLES = ['ADMIN', 'ADVISOR'] as const satisfies readonly Role[];
+export const COMMAND_CENTER_ROLES = [
+  'ADMIN',
+  'ADVISOR',
+  'ANALYST',
+] as const satisfies readonly Role[];
 
 export function isCommandCentreRole(role: Role | null): boolean {
   return role !== null && (COMMAND_CENTER_ROLES as readonly string[]).includes(role);
@@ -105,6 +116,7 @@ export function homePathForRole(role: Role): string {
       return '/collector/favourites';
     case 'ADMIN':
     case 'ADVISOR':
+    case 'ANALYST':
       return '/admin';
   }
 }

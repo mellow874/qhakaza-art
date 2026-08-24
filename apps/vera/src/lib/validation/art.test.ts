@@ -91,9 +91,9 @@ describe('artPieceSchemaForStatus', () => {
     expect(artPieceSchemaForStatus('HIDDEN').safeParse({ title: 'WIP' }).success).toBe(true);
   });
 
-  it('uses the strict schema for LISTED and SOLD', () => {
-    expect(artPieceSchemaForStatus('LISTED').safeParse({ title: 'WIP' }).success).toBe(false);
+  it('uses the strict schema for PUBLISHED and SOLD', () => {
+    expect(artPieceSchemaForStatus('PUBLISHED').safeParse({ title: 'WIP' }).success).toBe(false);
     expect(artPieceSchemaForStatus('SOLD').safeParse({ title: 'WIP' }).success).toBe(false);
-    expect(artPieceSchemaForStatus('LISTED').safeParse(completePiece).success).toBe(true);
+    expect(artPieceSchemaForStatus('PUBLISHED').safeParse(completePiece).success).toBe(true);
   });
 });

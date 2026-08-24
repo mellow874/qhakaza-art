@@ -15,6 +15,59 @@ export const CORE_ENTITIES = [
   'CollectorIntake',
   'CollectorVerification',
   'MemberInvitation',
+  'InvitationRecipientType',
+  'MediaAsset',
+  'InternalNote',
+  'InternalNoteRevision',
+  'ArtworkReviewRequest',
+
+  // VERA
+  'EvidenceType',
+  'ReliabilityLevel',
+  'GapType',
+  'SpecialistCategory',
+  'PartyRole',
+  'Party',
+  'Exhibition',
+  'Publication',
+  'ProvenanceTransaction',
+  'Source',
+  'Evidence',
+  'Claim',
+  'Assessment',
+  'Gap',
+  'Contradiction',
+  'SpecialistEscalation',
+  'MethodologyVersion',
+  'IntelligenceCase',
+  'CaseVersion',
+  'CaseArtwork',
+  'CaseEvidence',
+  'EvidenceClaim',
+  'ClaimAssessment',
+  'ArtworkParty',
+  'CaseParty',
+  'EvidenceSource',
+  'ArtworkExhibition',
+  'ArtworkPublication',
+
+  // Content surfaces
+  'FaqCategory',
+  'FaqItem',
+  'Briefing',
+  'BriefingRelation',
+  'LegalDocumentVersion',
+
+  // Visibility and release
+  'AudienceType',
+  'Audience',
+  'AudienceMember',
+  'ArtworkRelease',
+  'ArtistPermission',
+
+  // Profile and matching
+  'CollectorProfile',
+  'MatchSuggestion',
   'Artist',
   'Artwork',
   'NewsArticle',
@@ -43,6 +96,68 @@ export const ENTITY_DOMAIN = {
   CollectorIntake: 'collector',
   CollectorVerification: 'collector',
   MemberInvitation: 'collector',
+  // Not collector-only: artist invitations use it too, and the list of
+  // types is reference data rather than anyone's personal information.
+  InvitationRecipientType: 'platform',
+  // Spans both sides: artwork photographs are supply-side, evidence
+  // documents are internal. The row's own confidentiality decides.
+  MediaAsset: 'platform',
+  // Staff writing to staff. Never readable outside Qhakaza.
+  InternalNote: 'platform',
+  InternalNoteRevision: 'platform',
+  // The artist must be able to read the question asked of them.
+  ArtworkReviewRequest: 'supply',
+
+  // VERA. All internal: evidence, reasoning and Cases are Qhakaza's own
+  // working record, and none of it is client-facing.
+  EvidenceType: 'platform',
+  ReliabilityLevel: 'platform',
+  GapType: 'platform',
+  SpecialistCategory: 'platform',
+  PartyRole: 'platform',
+  Party: 'platform',
+  Exhibition: 'platform',
+  Publication: 'platform',
+  ProvenanceTransaction: 'platform',
+  Source: 'platform',
+  Evidence: 'platform',
+  Claim: 'platform',
+  Assessment: 'platform',
+  Gap: 'platform',
+  Contradiction: 'platform',
+  SpecialistEscalation: 'platform',
+  MethodologyVersion: 'platform',
+  IntelligenceCase: 'platform',
+  CaseVersion: 'platform',
+  CaseArtwork: 'platform',
+  CaseEvidence: 'platform',
+  EvidenceClaim: 'platform',
+  ClaimAssessment: 'platform',
+  ArtworkParty: 'platform',
+  CaseParty: 'platform',
+  EvidenceSource: 'platform',
+  ArtworkExhibition: 'platform',
+  ArtworkPublication: 'platform',
+
+  // Content surfaces. Published rows are read by the public sites.
+  FaqCategory: 'platform',
+  FaqItem: 'platform',
+  Briefing: 'platform',
+  BriefingRelation: 'platform',
+  LegalDocumentVersion: 'platform',
+
+  // Visibility and release. Who may see what is Qhakaza's decision to
+  // make and nobody else's to read.
+  AudienceType: 'platform',
+  Audience: 'platform',
+  AudienceMember: 'platform',
+  ArtworkRelease: 'platform',
+  ArtistPermission: 'platform',
+
+  // A collector's own record of preference, and the suggestions drawn from
+  // it. Both are Qhakaza's working material about a person.
+  CollectorProfile: 'collector',
+  MatchSuggestion: 'collector',
   ActivationAttempt: 'collector',
   PrivateNoteSubmission: 'collector',
 
@@ -76,6 +191,7 @@ export type {
   CollectorVerification,
   ContactMessage,
   DailyMetric,
+  InvitationRecipientType,
   MemberInvitation,
   Membership,
   NewsArticle,

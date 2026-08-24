@@ -118,7 +118,7 @@ async function main() {
       medium: 'Oil on canvas',
       dimensions: '900 x 1200 mm',
       price: 18500,
-      status: ArtStatus.LISTED,
+      status: ArtStatus.PUBLISHED,
     },
     {
       artistId: thandiProfileId,
@@ -126,7 +126,7 @@ async function main() {
       medium: 'Oil on canvas',
       dimensions: '600 x 900 mm',
       price: 12500,
-      status: ArtStatus.LISTED,
+      status: ArtStatus.PUBLISHED,
     },
     {
       artistId: thandiProfileId,
@@ -142,7 +142,7 @@ async function main() {
       medium: 'Acrylic on board',
       dimensions: '400 x 400 mm',
       price: 6800,
-      status: ArtStatus.LISTED,
+      status: ArtStatus.PUBLISHED,
     },
     {
       artistId: thandiProfileId,
@@ -158,7 +158,7 @@ async function main() {
       medium: 'Linocut on cotton rag',
       dimensions: '500 x 700 mm',
       price: 4500,
-      status: ArtStatus.LISTED,
+      status: ArtStatus.PUBLISHED,
     },
     {
       artistId: siphoProfileId,
@@ -166,7 +166,7 @@ async function main() {
       medium: 'Linocut on cotton rag',
       dimensions: '500 x 700 mm',
       price: 4500,
-      status: ArtStatus.LISTED,
+      status: ArtStatus.PUBLISHED,
     },
     {
       artistId: siphoProfileId,
@@ -174,7 +174,7 @@ async function main() {
       medium: 'Reclaimed steel',
       dimensions: '400 x 400 x 1100 mm',
       price: 32000,
-      status: ArtStatus.LISTED,
+      status: ArtStatus.PUBLISHED,
     },
     {
       artistId: siphoProfileId,
@@ -220,7 +220,7 @@ async function main() {
     },
   });
 
-  const listed = created.filter((piece) => piece.status === ArtStatus.LISTED);
+  const listed = created.filter((piece) => piece.status === ArtStatus.PUBLISHED);
   await prisma.favorite.createMany({
     data: [
       { collectorId: collectors[0].id, artworkId: listed[0].id },

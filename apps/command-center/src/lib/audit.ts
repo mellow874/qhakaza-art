@@ -18,7 +18,7 @@ import type { Prisma } from '@prisma/client';
  * without both a permitted role and a trail.
  */
 
-export type AuditActor = { userId: string; role: 'ADMIN' | 'ADVISOR' };
+export type AuditActor = { userId: string; role: 'ADMIN' | 'ADVISOR' | 'ANALYST' };
 
 export type AdminFailure = { ok: false; error: 'FORBIDDEN' | 'NOT_FOUND' | 'INVALID' | 'UNKNOWN' };
 
@@ -26,19 +26,37 @@ export type AdminFailure = { ok: false; error: 'FORBIDDEN' | 'NOT_FOUND' | 'INVA
 export function commandCentreActor(session: Session): AuditActor | AdminFailure {
   const grant = requireRole(session, COMMAND_CENTER_ROLES);
   if (!grant.ok) return { ok: false, error: 'FORBIDDEN' };
-  return { userId: grant.userId, role: grant.role as 'ADMIN' | 'ADVISOR' };
+  return { userId: grant.userId, role: grant.role as AuditActor['role'] };
 }
 
 export function isFailure(value: AuditActor | AdminFailure): value is AdminFailure {
   return 'ok' in value && value.ok === false;
 }
 
-/** The Command Center's roles, in the lower-case form the RLS policies read. */
+/**
+ * The Command Center's roles, in the lower-case form the RLS policies read.
+ *
+ * SPELLED OUT PER ROLE, deliberately. This was written as
+ * `role === 'ADMIN' ? 'admin' : 'advisor'` when there were two roles, which
+ * silently mapped a third to `advisor` the moment one existed -- handing every
+ * analyst the collector-table access that advisors have and analysts must not.
+ *
+ * An exhaustive switch means the next role added fails to compile here rather
+ * than quietly inheriting someone else's privileges.
+ */
 export function actorContext(actor: AuditActor) {
-  return {
-    role: actor.role === 'ADMIN' ? ('admin' as const) : ('advisor' as const),
-    userId: actor.userId,
-  };
+  const role = ((): 'admin' | 'advisor' | 'analyst' => {
+    switch (actor.role) {
+      case 'ADMIN':
+        return 'admin';
+      case 'ADVISOR':
+        return 'advisor';
+      case 'ANALYST':
+        return 'analyst';
+    }
+  })();
+
+  return { role, userId: actor.userId };
 }
 
 /**

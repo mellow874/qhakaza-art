@@ -1,18 +1,26 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { prisma } from '@qhakaza/shared-db';
+import { releasePublicly } from '@qhakaza/shared-db';
 import { makeArtistWithProfile, resetDb } from '@tests/helpers/db';
 
 const { getFeaturedArtists, getFeaturedWorks } = await import('./queries');
 
 type PieceOverrides = {
   title?: string;
-  status?: 'DRAFT' | 'LISTED' | 'SOLD' | 'HIDDEN';
+  status?: 'DRAFT' | 'PUBLISHED' | 'SOLD' | 'HIDDEN';
   createdAt?: Date;
 };
 
+/**
+ * A work, and where it should be visible.
+ *
+ * `status: 'PUBLISHED'` used to be the whole story. Public visibility now needs
+ * an editorial release and the artist's permission as well, which
+ * `releasePublicly` supplies.
+ */
 async function makePiece(artistId: string, overrides: PieceOverrides = {}) {
-  return prisma.artwork.create({
+  const piece = await prisma.artwork.create({
     data: {
       artistId,
       title: overrides.title ?? 'A piece',
@@ -22,10 +30,25 @@ async function makePiece(artistId: string, overrides: PieceOverrides = {}) {
       dimensions: '600 x 900 mm',
       price: 5000,
       currency: 'ZAR',
-      status: overrides.status ?? 'LISTED',
+      status: 'DRAFT',
       ...(overrides.createdAt ? { createdAt: overrides.createdAt } : {}),
     },
   });
+
+  if ((overrides.status ?? 'PUBLISHED') === 'PUBLISHED') {
+    await releasePublicly(piece.id, artistId);
+    // releasePublicly moves the status, so restore any deliberate createdAt.
+    if (overrides.createdAt) {
+      await prisma.artwork.update({
+        where: { id: piece.id },
+        data: { createdAt: overrides.createdAt },
+      });
+    }
+  } else if (overrides.status !== 'DRAFT') {
+    await prisma.artwork.update({ where: { id: piece.id }, data: { status: 'ARCHIVED' } });
+  }
+
+  return piece;
 }
 
 beforeEach(async () => {
@@ -141,8 +164,8 @@ describe('getFeaturedArtists', () => {
 
   it('counts only the available work on each storefront', async () => {
     const { profile } = await makeArtistWithProfile({ approved: true });
-    await makePiece(profile.id, { status: 'LISTED' });
-    await makePiece(profile.id, { status: 'LISTED' });
+    await makePiece(profile.id, { status: 'PUBLISHED' });
+    await makePiece(profile.id, { status: 'PUBLISHED' });
     await makePiece(profile.id, { status: 'SOLD' });
     await makePiece(profile.id, { status: 'DRAFT' });
 

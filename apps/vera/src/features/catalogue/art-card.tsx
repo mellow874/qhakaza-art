@@ -4,13 +4,21 @@ import Link from 'next/link';
 import { formatMoney, type MoneyInput } from '@/lib/format/money';
 import type { Currency } from '@/lib/validation/art';
 
+/**
+ * PRICE IS OPTIONAL, AND THE PUBLIC SITE NEVER PASSES IT.
+ *
+ * The same card serves the public editorial pages and, later, collector
+ * surfaces. Public queries do not select price at all - not "select it and
+ * hide it", which is one careless render away from a leak - so the card simply
+ * shows nothing where there is nothing.
+ */
 export type ArtCardWork = {
   id: string;
   title: string;
   images: string[];
   medium: string;
-  price: MoneyInput;
-  currency: string;
+  price?: MoneyInput | null;
+  currency?: string | null;
   artist: { displayName: string; slug: string };
 };
 
@@ -61,9 +69,11 @@ export function ArtCard({ work }: { work: ArtCardWork }) {
           {work.artist.displayName}
         </Link>
         <p className="text-muted text-xs">{work.medium}</p>
-        <p className="text-accent mt-2 text-sm">
-          {formatMoney(work.price, work.currency as Currency)}
-        </p>
+        {work.price != null && work.currency && (
+          <p className="text-accent mt-2 text-sm">
+            {formatMoney(work.price, work.currency as Currency)}
+          </p>
+        )}
       </div>
     </article>
   );

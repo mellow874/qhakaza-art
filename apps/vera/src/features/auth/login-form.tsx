@@ -9,9 +9,17 @@ import { credentialsSchema } from '@qhakaza/shared-auth';
 
 type Props = {
   callbackUrl?: string;
+  /**
+   * Whether Google sign-in is configured on the server.
+   *
+   * Read server-side and passed in: a client component cannot see
+   * GOOGLE_CLIENT_ID, and a button that opens a broken OAuth screen is worse
+   * than no button. Absent credentials simply mean the option is not offered.
+   */
+  googleEnabled?: boolean;
 };
 
-export function LoginForm({ callbackUrl }: Props) {
+export function LoginForm({ callbackUrl, googleEnabled = false }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -108,20 +116,24 @@ export function LoginForm({ callbackUrl }: Props) {
         </Button>
       </form>
 
-      <div className="flex items-center gap-4">
-        <span className="bg-line h-px flex-1" />
-        <span className="text-muted text-xs tracking-[0.2em] uppercase">or</span>
-        <span className="bg-line h-px flex-1" />
-      </div>
+      {googleEnabled && (
+        <>
+          <div className="flex items-center gap-4">
+            <span className="bg-line h-px flex-1" />
+            <span className="text-muted text-xs tracking-[0.2em] uppercase">or</span>
+            <span className="bg-line h-px flex-1" />
+          </div>
 
-      <Button
-        type="button"
-        variant="secondary"
-        size="lg"
-        onClick={() => signIn('google', { redirectTo })}
-      >
-        Continue with Google
-      </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="lg"
+            onClick={() => signIn('google', { redirectTo })}
+          >
+            Continue with Google
+          </Button>
+        </>
+      )}
     </div>
   );
 }

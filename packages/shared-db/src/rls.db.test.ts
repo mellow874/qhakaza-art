@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { CORE_ENTITIES } from './entities';
+import { releasePublicly } from './test-visibility';
 import { policyExpression, RLS_MATRIX, type EntityPolicy, type Operation } from './rls';
 
 /**
@@ -108,9 +109,16 @@ beforeAll(async () => {
       medium: 'Oil',
       dimensions: '1x1',
       price: '100',
-      status: 'LISTED',
+      // Visible to the public only through an editorial release plus the
+      // artist's permission - `releasePublicly` supplies both.
+      status: 'DRAFT',
     },
   });
+
+  const releasedWork = await owner.artwork.findFirstOrThrow({
+    where: { title: 'Their Released Work' },
+  });
+  await releasePublicly(releasedWork.id, theirs.id);
 
   await owner.collectorIntake.create({
     data: { fullName: 'Private Applicant', email: 'applicant@test.local' },
@@ -227,13 +235,22 @@ describe('an artist cannot reach the collector side', () => {
   });
 });
 
-describe('a collector sees only released work and their own records', () => {
-  it('sees released work but never a draft', async () => {
+describe('a collector sees only work released to them, and their own records', () => {
+  it('sees NOTHING of work released only to the public', async () => {
+    /*
+     * This asserted the opposite until the visibility model landed, because
+     * "released" was one condition serving both the public site and every
+     * collector. A public editorial release is now a different permission
+     * entirely, and grants a collector nothing.
+     *
+     * What a collector CAN see, and the many ways they cannot, is covered
+     * exhaustively in visibility.db.test.ts.
+     */
     const titles = await as('collector', collectorUserId, async (tx) =>
       (await tx.artwork.findMany({ select: { title: true } })).map((w) => w.title),
     );
 
-    expect(titles).toEqual(['Their Released Work']);
+    expect(titles).toEqual([]);
   });
 
   it('cannot read collector intakes, including anyone else’s', async () => {

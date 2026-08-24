@@ -25,7 +25,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   // Applications connect as `qhakaza_app`: not the owner, not a superuser, no
   // BYPASSRLS. This is what makes the policies bite.
   url       = env("DATABASE_URL")
@@ -46,13 +46,66 @@ enum Role {
   COLLECTOR
   ADMIN
   ADVISOR
+  /// Internal Analyst. Confirmed as a fifth role, distinct from ADVISOR:
+  /// analysts work Cases, evidence and research; advisors run concierge work.
+  ANALYST
 }
 
+/// The publication states.
+///
+///   DRAFT -> SUBMITTED -> UNDER_REVIEW -> APPROVED -> COLLECTOR_READY
+///        -> RELEASED_TO_AUDIENCE
+///
+/// plus RETURNED_FOR_INFORMATION and REJECTED, which interrupt it, and
+/// RESTRICTED, PUBLIC_EDITORIAL, ARCHIVED and SUPERSEDED.
+///
+/// APPROVAL IS NOT PUBLICATION, AND PUBLICATION IS NOT PUBLIC. Those are three
+/// different facts:
+///
+///   APPROVED              Qhakaza has vetted it. Nobody outside can see it.
+///   COLLECTOR_READY       A collector-safe projection exists. Still nobody
+///                         outside can see it - no audience holds it yet.
+///   RELEASED_TO_AUDIENCE  At least one un-revoked ArtworkRelease exists. Who
+///                         sees it is decided by that release, never by this
+///                         column.
+///   PUBLIC_EDITORIAL      Separately authorised editorial use. Requires the
+///                         artist's PUBLISH_PUBLICLY permission.
+///
+/// The status says how far along a work is. It never says who may see it -
+/// that is what ArtworkRelease is for, and RLS reads the release, not this.
+///
+/// PUBLISHED, SOLD, HIDDEN and LISTED are retired spellings kept because
+/// PostgreSQL cannot drop an enum value. Existing rows were migrated:
+/// PUBLISHED -> COLLECTOR_READY (approved, but released to nobody until
+/// assigned), SOLD and HIDDEN -> ARCHIVED. Nothing writes them now.
 enum ArtStatus {
   DRAFT
-  LISTED
+  SUBMITTED
+  UNDER_REVIEW
+  RETURNED_FOR_INFORMATION
+  APPROVED
+  /// Vetted and prepared for collectors, held back until released.
+  COLLECTOR_READY
+  /// One or more audiences hold it. The releases say which.
+  RELEASED_TO_AUDIENCE
+  /// Deliberately withheld - a dispute, a request, an embargo.
+  RESTRICTED
+  /// Authorised for editorial or brand use. Never inventory.
+  PUBLIC_EDITORIAL
+  REJECTED
+  /// No longer in circulation. Retained, never deleted.
+  ARCHIVED
+  /// Replaced by a newer record of the same work.
+  SUPERSEDED
+
+  /// @deprecated see the note above
+  PUBLISHED
+  /// @deprecated folded into ARCHIVED
   SOLD
+  /// @deprecated folded into ARCHIVED
   HIDDEN
+  /// @deprecated original spelling of PUBLISHED
+  LISTED
 }
 
 enum OrderStatus {
@@ -60,6 +113,22 @@ enum OrderStatus {
   PAID
   CANCELLED
   REFUNDED
+}
+
+/// Which of the three collector-side journeys produced an intake.
+///
+/// One table rather than three near-identical ones: all three are a
+/// prospective collector telling us about themselves, they are vetted by the
+/// same people in the same queue, and they carry the same sensitive fields.
+/// The discriminator keeps them distinguishable without forking the entity.
+enum CollectorIntakeKind {
+  /// "Begin Intake" — full onboarding for a new collector.
+  INTAKE
+  /// "Request Access" — a limited preview window, after onboarding.
+  ACCESS_REQUEST
+  /// "Request Membership Consideration" — for someone who cannot currently
+  /// meet the membership fee and is asking to be considered anyway.
+  MEMBERSHIP_CONSIDERATION
 }
 
 enum CollectorIntakeStatus {
@@ -84,10 +153,37 @@ enum MembershipStatus {
   REVOKED
 }
 
+/// The invitation lifecycle, as specified by the handover brief:
+///
+///   CREATED -> SENT -> OPENED -> ACCEPTED -> COMPLETED
+///
+/// plus EXPIRED and CANCELLED, which can interrupt it at any point.
+///
+/// ISSUED and REVOKED are the ORIGINAL spellings, kept because PostgreSQL
+/// cannot drop an enum value without recreating the type, and because this
+/// project does not rewrite history it does not have to. Existing rows were
+/// migrated ISSUED -> CREATED and REVOKED -> CANCELLED; nothing writes the old
+/// two any more. Treat them as read-only synonyms if you meet them in old data.
 enum InvitationStatus {
-  ISSUED
+  /// The record exists and a link has been generated. Not yet emailed.
+  CREATED
+  /// Handed to the email layer successfully.
+  SENT
+  /// The recipient followed the link at least once.
+  OPENED
+  /// The recipient signed in and the invitation was consumed. Single-use.
   ACCEPTED
+  /// Onboarding finished - the artist has a profile, or the collector a
+  /// membership. The end of the happy path.
+  COMPLETED
+  /// Past `expiresAt` without being accepted.
   EXPIRED
+  /// Withdrawn by staff before acceptance.
+  CANCELLED
+
+  /// @deprecated original spelling of CREATED
+  ISSUED
+  /// @deprecated original spelling of CANCELLED
   REVOKED
 }
 
@@ -167,8 +263,9 @@ model Artist {
   updatedAt   DateTime @updatedAt @map("updated_date")
   createdById String?  @map("created_by_id")
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  artworks Artwork[]
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artworks    Artwork[]
+  permissions ArtistPermission[]
 
   @@index([approved])
   @@index([createdById])
@@ -190,10 +287,32 @@ model Artwork {
   updatedAt   DateTime  @updatedAt @map("updated_date")
   createdById String?   @map("created_by_id")
 
-  artist    Artist                  @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  orders    Order[]
-  favorites Favorite[]
-  notes     PrivateNoteSubmission[]
+  artist         Artist                 @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  reviewRequests ArtworkReviewRequest[]
+  orders         Order[]
+
+  /// What the work is about, for matching against collector preferences.
+  /// Free text rather than a fixed vocabulary: Qhakaza's language for its own
+  /// artists is not a list a developer should be inventing.
+  themes String[]
+
+  // Visibility and release
+  releases    ArtworkRelease[]
+  suggestions MatchSuggestion[]
+  permissions ArtistPermission[]
+
+  // VERA
+  evidence     Evidence[]
+  claims       Claim[]
+  gaps         Gap[]
+  escalations  SpecialistEscalation[]
+  caseLinks    CaseArtwork[]
+  partyLinks   ArtworkParty[]
+  exhibitions  ArtworkExhibition[]
+  publications ArtworkPublication[]
+  transactions ProvenanceTransaction[]
+  favorites    Favorite[]
+  notes        PrivateNoteSubmission[]
 
   @@index([artistId])
   @@index([status])
@@ -214,6 +333,9 @@ model Artwork {
 model CollectorIntake {
   id     String                @id @default(cuid())
   status CollectorIntakeStatus @default(AWAITING_VERIFICATION)
+  /// Defaults to INTAKE so every row written before the three journeys were
+  /// separated keeps its original meaning.
+  kind   CollectorIntakeKind   @default(INTAKE)
 
   fullName String
   email    String
@@ -224,11 +346,17 @@ model CollectorIntake {
   annualIncomeBand String?
   liquidAssetsBand String?
 
-  collectingGoal String?
-  artExposure    String?
+  collectingGoal   String?
+  artExposure      String?
   /// Free-form rather than an enum: the medium list is marketing copy that will
   /// change without a migration, and a stale enum would reject a live option.
   preferredMediums String[]
+
+  /// Why the applicant cannot currently meet the membership fee, in their own
+  /// words. Only ever set on a MEMBERSHIP_CONSIDERATION.
+  considerationNote String?
+  /// What an ACCESS_REQUEST wants to preview.
+  accessInterest    String?
 
   createdAt   DateTime @default(now()) @map("created_date")
   updatedAt   DateTime @updatedAt @map("updated_date")
@@ -236,8 +364,10 @@ model CollectorIntake {
 
   verification CollectorVerification?
   membership   Membership?
+  cases        IntelligenceCase[]
 
   @@index([status, createdAt])
+  @@index([kind, createdAt])
   @@index([email])
   @@index([createdById])
 }
@@ -286,6 +416,9 @@ model Membership {
   intake      CollectorIntake?        @relation(fields: [intakeId], references: [id], onDelete: SetNull)
   invitations MemberInvitation[]
   notes       PrivateNoteSubmission[]
+  audiences   AudienceMember[]
+  profile     CollectorProfile?
+  suggestions MatchSuggestion[]
 
   @@index([status])
   @@index([userId])
@@ -297,25 +430,244 @@ model Membership {
 /// `tokenHash` stores a SHA-256 of the token, never the token itself: a leaked
 /// database dump must not hand over working invitations. The plaintext exists
 /// only in the invitation email.
-model MemberInvitation {
-  id           String           @id @default(cuid())
-  membershipId String?
-  email        String
-  tokenHash    String           @unique
-  status       InvitationStatus @default(ISSUED)
-  expiresAt    DateTime
-  acceptedAt   DateTime?
-  revokedAt    DateTime?
+/// A note written by staff, about anything.
+///
+/// THIS IS THE INTERNAL ADMINISTRATIVE NOTE from the handover brief, and it is
+/// a THIRD concept distinct from the two that already carry the name:
+///
+///   PrivateNote            a prospect's RSVP survey, collector-facing
+///   PrivateNoteSubmission  a member's enquiry to their advisor
+///   InternalNote           this: staff writing to staff, never seen outside
+///
+/// None of the three was repurposed into another. They have different authors,
+/// different readers and different lifetimes.
+///
+/// SEPARATE FROM EVIDENCE, DELIBERATELY. A note never becomes part of a
+/// Collector Intelligence Case by accident: `convertedToEvidenceId` is set only
+/// when an authorised user deliberately converts it. Private comments must
+/// never surface in a Case simply because they were attached to the same
+/// artwork.
+model InternalNote {
+  id String @id @default(cuid())
+
+  /// What the note is about: "Artist", "Artwork", "CollectorIntake", "Case".
+  /// A string rather than an enum so the VERA phases can attach notes to their
+  /// own records without a migration.
+  subjectType String
+  subjectId   String
+
+  body String
+
+  /// Set only by a deliberate conversion. Until then the note is not evidence
+  /// and must not be read as though it were.
+  convertedToEvidenceId String?
+  convertedAt           DateTime?
+  convertedById         String?
+
+  authorId String?
 
   createdAt   DateTime @default(now()) @map("created_date")
   updatedAt   DateTime @updatedAt @map("updated_date")
   createdById String?  @map("created_by_id")
 
-  membership Membership?         @relation(fields: [membershipId], references: [id], onDelete: SetNull)
-  attempts   ActivationAttempt[]
+  revisions InternalNoteRevision[]
+
+  @@index([subjectType, subjectId])
+  @@index([authorId])
+  @@index([createdById])
+}
+
+/// The previous text of a note, kept whenever it is materially changed.
+///
+/// Append-only. The brief requires notes to preserve an audit history, and a
+/// note that can be quietly rewritten is not a record of anything. Editing
+/// writes the OLD body here first, so the chain reads backwards from the
+/// current text.
+model InternalNoteRevision {
+  id     String @id @default(cuid())
+  noteId String
+
+  /// The body as it was before this edit.
+  previousBody String
+  editedById   String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  note InternalNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([noteId, createdAt])
+  @@index([createdById])
+}
+
+/// A reviewer sending a submission back with a question.
+///
+/// A record rather than a status alone, because "returned for information" is
+/// useless to an artist who cannot see what was asked. Kept after resolution:
+/// what was asked, and when it was answered, is part of the work's history.
+model ArtworkReviewRequest {
+  id        String @id @default(cuid())
+  artworkId String
+
+  /// What the reviewer needs. Shown to the artist verbatim.
+  request String
+
+  requestedById String?
+  resolvedAt    DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artwork Artwork @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  @@index([artworkId, resolvedAt])
+  @@index([createdById])
+}
+
+/// How sensitive a stored file is.
+///
+/// Section 22 requires that unpublished evidence and internal analysis are
+/// never exposed through client-facing permissions. This is the per-file half
+/// of that: RLS decides who may read the ROW, and this decides how the file
+/// behind it may be served.
+enum FileConfidentiality {
+  /// Servable to anyone. Released artwork photographs.
+  PUBLIC
+  /// Staff only. Evidence documents, specialist reports, correspondence.
+  INTERNAL
+  /// Staff with a specific need. Named parties, legal material.
+  CONFIDENTIAL
+}
+
+enum MediaAssetStatus {
+  /// A signed upload URL was issued; the browser has not confirmed the upload.
+  PENDING
+  /// The object is in the bucket.
+  STORED
+  /// Withdrawn from view. The object is NOT deleted - see the model comment.
+  DELETED
+}
+
+/// Every file the platform stores, whatever it belongs to.
+///
+/// One table for artwork photographs, evidence documents, specialist reports
+/// and correspondence, because section 23 asks the same seven questions of all
+/// of them: who uploaded it, when, under what name, of what type and size,
+/// against which record, and how confidential.
+///
+/// POLYMORPHIC BY SUBJECT rather than one nullable foreign key per owner. The
+/// VERA phases add several more owners, and a table that grows a column per
+/// owner type ends up mostly nulls.
+///
+/// NOTHING IS EVER HARD-DELETED. Section 23 requires files to remain
+/// retrievable even when the visible record changes, so `status` moves to
+/// DELETED and the object stays in the bucket. A file that has been referenced
+/// in an assessment must still be produceable afterwards.
+model MediaAsset {
+  id String @id @default(cuid())
+
+  /// What this file belongs to: "Artwork", "Evidence", "SpecialistOpinion"...
+  /// Deliberately a string, not an enum: the VERA phases add subjects, and a
+  /// new one should not need a migration.
+  subjectType String
+  subjectId   String
+
+  /// Where the bytes are. Together these are the storage location.
+  bucket      String
+  storagePath String @unique
+
+  /// What the person called it. Kept separate from `storagePath`, which is
+  /// generated - two artists both uploading "final.jpg" must not collide.
+  originalFilename String
+  contentType      String
+  sizeBytes        Int
+
+  status          MediaAssetStatus    @default(PENDING)
+  confidentiality FileConfidentiality @default(INTERNAL)
+
+  /// Ordering within its subject, for a gallery of several images.
+  position Int @default(0)
+
+  uploadedById String?
+  uploadedAt   DateTime?
+  deletedAt    DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  @@index([subjectType, subjectId, status])
+  @@index([status, createdAt])
+  @@index([uploadedById])
+  @@index([createdById])
+}
+
+/// Who an invitation can be addressed to.
+///
+/// A TABLE, not an enum, because the brief requires the type list to stay
+/// extensible. Adding "Institution" or "Advisor" later must be a row, not a
+/// migration and a redeploy.
+model InvitationRecipientType {
+  id         String  @id @default(cuid())
+  /// Stable machine name. Referenced in code; never shown to a user.
+  slug       String  @unique
+  label      String
+  /// The role the accepted account is given. Kept here so the mapping from
+  /// invitation to role is data rather than a switch statement.
+  grantsRole Role
+  /// Retired types stop being offered without breaking the rows that used them.
+  active     Boolean @default(true)
+  ordering   Int     @default(0)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  invitations MemberInvitation[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+model MemberInvitation {
+  id              String           @id @default(cuid())
+  /// Null for artist invitations: an artist has no membership to attach to.
+  membershipId    String?
+  /// Null only for rows predating the recipient-type table.
+  recipientTypeId String?
+  recipientName   String?
+  email           String
+  tokenHash       String           @unique
+  status          InvitationStatus @default(CREATED)
+  expiresAt       DateTime
+
+  /// The lifecycle timestamps. Each is set once, by the transition that earns
+  /// it, and never cleared - the row is its own history.
+  sentAt      DateTime?
+  openedAt    DateTime?
+  acceptedAt  DateTime?
+  completedAt DateTime?
+  revokedAt   DateTime?
+
+  /// Who pressed send, which is not always who created the record.
+  sentById         String?
+  /// The account this invitation produced. The single-use guarantee: an
+  /// invitation with this set has already made its user and cannot make another.
+  acceptedByUserId String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  membership    Membership?              @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  recipientType InvitationRecipientType? @relation(fields: [recipientTypeId], references: [id], onDelete: SetNull)
+  attempts      ActivationAttempt[]
 
   @@index([status, expiresAt])
   @@index([email])
+  @@index([recipientTypeId, status])
   @@index([createdById])
 }
 
@@ -362,6 +714,56 @@ model PrivateNoteSubmission {
 
   @@index([status, createdAt])
   @@index([membershipId])
+  @@index([createdById])
+}
+
+/// The Private Note — an RSVP-style survey from a *prospective* collector.
+///
+/// A SEPARATE ENTITY from `PrivateNoteSubmission`, despite the similar name,
+/// and deliberately so:
+///
+///   PrivateNoteSubmission  a member writing to their advisor about a work.
+///                          Requires a Membership. Already live and tested.
+///   PrivateNote            someone who is not yet a member telling us what
+///                          they collect and how we could serve them.
+///
+/// Folding the second into the first would have meant changing what an existing,
+/// working table means — and its `membershipId` has nowhere to point for a
+/// prospect. Flagged rather than assumed: if the founder considers these one
+/// concept, they should be merged deliberately, not by side effect.
+model PrivateNote {
+  id       String @id @default(cuid())
+  fullName String
+  email    String
+
+  /// Interests. Free-form arrays for the same reason `preferredMediums` is:
+  /// these lists are editorial and will change without a migration.
+  mediums  String[]
+  regions  String[]
+  subjects String?
+
+  /// Preferences.
+  acquisitionPace String?
+  budgetBand      String?
+  advisoryStyle   String?
+  contactStyle    String?
+
+  /// How Qhakaza can serve them.
+  building     String?
+  frustrations String?
+  goodOutcome  String?
+
+  /// Explicit permission to be contacted about what they wrote.
+  mayContact Boolean @default(false)
+
+  status NoteStatus @default(SUBMITTED)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  @@index([status, createdAt])
+  @@index([email])
   @@index([createdById])
 }
 
@@ -567,4 +969,1211 @@ model VerificationToken {
   expires    DateTime
 
   @@id([identifier, token])
+}
+
+// ===========================================================================
+// VERA - the evidence and decision-intelligence layer
+//
+// A structured evidence system, not a report generator. The shape below is
+// dictated by six constraints the brief states explicitly. Each is a thing
+// this schema must NOT be able to express:
+//
+//   1. one evidence -> one claim       EvidenceClaim junction
+//   2. one artwork  -> one Case        CaseArtwork junction
+//   3. one Case     -> one specialist  SpecialistEscalation is many per Case
+//   4. fixed evidence categories       lookup TABLES, never enums
+//   5. conclusions overwriting earlier CaseVersion is immutable; Contradiction
+//                                      rows are preserved, never resolved away
+//   6. VERA as a report generator      the graph is the record; a Case is a
+//                                      view over it at a moment in time
+//
+// The reasoning path is reconstructible end to end:
+//
+//   Source -> Evidence -> (EvidenceClaim) -> Claim -> (ClaimAssessment)
+//          -> Assessment -> Gap | Conclusion
+// ===========================================================================
+
+/// Where a Case is in its life. An enum, not a lookup: these are workflow
+/// states the application reasons about, unlike evidence categories which are
+/// taxonomy the business extends.
+enum CaseStatus {
+  OPEN
+  EVIDENCE_COLLECTION
+  UNDER_ANALYSIS
+  UNDER_REVIEW
+  AWAITING_SIGNATURE
+  ISSUED
+  WITHDRAWN
+}
+
+enum ClaimStatus {
+  ASSERTED
+  SUPPORTED
+  CONTESTED
+  UNVERIFIED
+  WITHDRAWN
+}
+
+enum EvidenceStatus {
+  RECEIVED
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+  SUPERSEDED
+}
+
+enum GapStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  ACCEPTED_AS_LIMITATION
+}
+
+enum EscalationStatus {
+  REQUESTED
+  ACKNOWLEDGED
+  IN_PROGRESS
+  ANSWERED
+  DECLINED
+}
+
+enum MethodologyStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+}
+
+// --- Configurable taxonomy -------------------------------------------------
+// TABLES, not enums. The brief is explicit that evidence categories must not
+// be hard-coded enums requiring a redeployment to extend.
+
+model EvidenceType {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  label    String
+  /// What the category is for, so a researcher picks the right one.
+  guidance String?
+  active   Boolean @default(true)
+  ordering Int     @default(0)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  evidence Evidence[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+/// How much weight evidence carries. A table because the scale itself may be
+/// revised, and historical Cases must keep the scale they were judged under.
+model ReliabilityLevel {
+  id     String  @id @default(cuid())
+  slug   String  @unique
+  label  String
+  /// Higher is stronger. For ordering only; never arithmetic.
+  rank   Int     @default(0)
+  active Boolean @default(true)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  evidence Evidence[]
+
+  @@index([active, rank])
+  @@index([createdById])
+}
+
+model GapType {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  label    String
+  active   Boolean @default(true)
+  ordering Int     @default(0)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  gaps Gap[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+model SpecialistCategory {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  label    String
+  active   Boolean @default(true)
+  ordering Int     @default(0)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  escalations SpecialistEscalation[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+/// What a party is to an artwork or a Case: owner, previous owner, gallery,
+/// dealer, institution, specialist. A table so the list can grow.
+model PartyRole {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  label    String
+  active   Boolean @default(true)
+  ordering Int     @default(0)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artworkParties ArtworkParty[]
+  caseParties    CaseParty[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+// --- Entities in the graph -------------------------------------------------
+
+/// A person or organisation: owner, gallery, dealer, institution, specialist.
+///
+/// ONE TABLE rather than five near-identical ones. The same gallery can be the
+/// seller in one transaction and the lender to an exhibition in another, so the
+/// role belongs to the RELATIONSHIP and lives on the junctions.
+model Party {
+  id           String  @id @default(cuid())
+  name         String
+  /// Free text: "Gallery", "Estate", "Private collector", "Museum".
+  kind         String?
+  country      String?
+  contactEmail String?
+  notes        String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artworkLinks     ArtworkParty[]
+  caseLinks        CaseParty[]
+  transactionsFrom ProvenanceTransaction[] @relation("TransactionFrom")
+  transactionsTo   ProvenanceTransaction[] @relation("TransactionTo")
+  escalations      SpecialistEscalation[]
+
+  @@index([name])
+  @@index([createdById])
+}
+
+model Exhibition {
+  id        String    @id @default(cuid())
+  title     String
+  venue     String?
+  startDate DateTime?
+  endDate   DateTime?
+  notes     String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artworks ArtworkExhibition[]
+
+  @@index([title])
+  @@index([createdById])
+}
+
+model Publication {
+  id          String    @id @default(cuid())
+  title       String
+  author      String?
+  publishedOn DateTime?
+  reference   String?
+  notes       String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artworks ArtworkPublication[]
+
+  @@index([title])
+  @@index([createdById])
+}
+
+/// A change of hands. Provenance is a chain of these.
+model ProvenanceTransaction {
+  id          String    @id @default(cuid())
+  artworkId   String
+  fromPartyId String?
+  toPartyId   String?
+  occurredOn  DateTime?
+  amount      Decimal?  @db.Decimal(14, 2)
+  currency    String?
+  notes       String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artwork   Artwork @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  fromParty Party?  @relation("TransactionFrom", fields: [fromPartyId], references: [id], onDelete: SetNull)
+  toParty   Party?  @relation("TransactionTo", fields: [toPartyId], references: [id], onDelete: SetNull)
+
+  @@index([artworkId, occurredOn])
+  @@index([createdById])
+}
+
+/// Where evidence came from. Distinct from the evidence itself: one archive is
+/// the source of many documents, and a source has its own standing.
+model Source {
+  id          String    @id @default(cuid())
+  name        String
+  kind        String?
+  sourceDate  DateTime?
+  description String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  evidenceLinks EvidenceSource[]
+
+  @@index([name])
+  @@index([createdById])
+}
+
+// --- The reasoning chain ---------------------------------------------------
+
+/// One item of evidence.
+///
+/// Carries every field section 5.2 lists. Two of them - "claim supported" and
+/// "Case ID" - are junctions rather than columns, because the brief forbids
+/// assuming one evidence supports one claim or belongs to one Case.
+model Evidence {
+  id String @id @default(cuid())
+
+  /// The work this concerns. Optional: some evidence is about a party or a
+  /// transaction rather than an object.
+  artworkId String?
+
+  evidenceTypeId String?
+  reliabilityId  String?
+
+  description String
+  notes       String?
+
+  /// When the source document is dated, as against when we received it.
+  sourceDate    DateTime?
+  receivedAt    DateTime?
+  submittedById String?
+
+  status          EvidenceStatus      @default(RECEIVED)
+  confidentiality FileConfidentiality @default(INTERNAL)
+
+  /// Set when this evidence participates in a contradiction. A flag for
+  /// filtering; the Contradiction rows are the record.
+  contradicted Boolean @default(false)
+
+  reviewerId String?
+  reviewedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artwork      Artwork?          @relation(fields: [artworkId], references: [id], onDelete: SetNull)
+  evidenceType EvidenceType?     @relation(fields: [evidenceTypeId], references: [id], onDelete: SetNull)
+  reliability  ReliabilityLevel? @relation(fields: [reliabilityId], references: [id], onDelete: SetNull)
+
+  claimLinks             EvidenceClaim[]
+  caseLinks              CaseEvidence[]
+  sourceLinks            EvidenceSource[]
+  contradictionsAsFirst  Contradiction[]  @relation("ContradictionFirst")
+  contradictionsAsSecond Contradiction[]  @relation("ContradictionSecond")
+
+  @@index([artworkId, status])
+  @@index([evidenceTypeId])
+  @@index([status, createdAt])
+  @@index([createdById])
+}
+
+/// Something asserted about an artwork or a party, which evidence may support
+/// or tell against. The unit an assessment is made about.
+model Claim {
+  id        String  @id @default(cuid())
+  artworkId String?
+
+  /// The assertion itself, in plain words.
+  statement String
+  status    ClaimStatus @default(ASSERTED)
+  /// Whether the Case's conclusion turns on this one.
+  material  Boolean     @default(false)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artwork Artwork? @relation(fields: [artworkId], references: [id], onDelete: SetNull)
+
+  evidenceLinks   EvidenceClaim[]
+  assessmentLinks ClaimAssessment[]
+  gaps            Gap[]
+
+  @@index([artworkId, status])
+  @@index([createdById])
+}
+
+/// A reasoned judgement about one or more claims.
+///
+/// Inference and uncertainty are their own columns rather than prose, because
+/// the brief requires evidence, inference and uncertainty to be distinct data
+/// concepts rather than three things said in one paragraph.
+model Assessment {
+  id String @id @default(cuid())
+
+  /// What we conclude.
+  conclusion  String
+  /// The reasoning from evidence to conclusion - the step that is NOT evidence.
+  inference   String?
+  /// What remains unknown, and what would change the conclusion.
+  uncertainty String?
+
+  methodologyVersionId String?
+  assessedById         String?
+  assessedAt           DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  methodologyVersion MethodologyVersion? @relation(fields: [methodologyVersionId], references: [id], onDelete: SetNull)
+
+  claimLinks ClaimAssessment[]
+  gaps       Gap[]
+
+  @@index([methodologyVersionId])
+  @@index([createdById])
+}
+
+/// Something missing, weak, or needing a specialist.
+model Gap {
+  id           String  @id @default(cuid())
+  caseId       String?
+  artworkId    String?
+  claimId      String?
+  assessmentId String?
+
+  gapTypeId String?
+
+  description      String
+  /// How much it matters to the conclusion.
+  materiality      String?
+  responsibleParty String?
+  actionRequired   String?
+
+  identifiedAt DateTime  @default(now())
+  dueAt        DateTime?
+  status       GapStatus @default(OPEN)
+  resolution   String?
+  resolvedAt   DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  case       IntelligenceCase? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  artwork    Artwork?          @relation(fields: [artworkId], references: [id], onDelete: SetNull)
+  claim      Claim?            @relation(fields: [claimId], references: [id], onDelete: SetNull)
+  assessment Assessment?       @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  gapType    GapType?          @relation(fields: [gapTypeId], references: [id], onDelete: SetNull)
+
+  @@index([caseId, status])
+  @@index([artworkId])
+  @@index([status, dueAt])
+  @@index([createdById])
+}
+
+/// Two items of evidence that cannot both be right.
+///
+/// NEVER OVERWRITTEN BY LATER EVIDENCE. The brief is explicit that
+/// contradictions are preserved. Resolving one records HOW it was resolved and
+/// leaves both sides standing, because which evidence was set aside, and why,
+/// is part of the institutional record.
+model Contradiction {
+  id     String  @id @default(cuid())
+  caseId String?
+
+  firstEvidenceId  String
+  secondEvidenceId String
+
+  description String
+  materiality String?
+
+  /// How it was resolved, if it was. Both sides remain regardless.
+  resolution   String?
+  resolvedAt   DateTime?
+  resolvedById String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  case           IntelligenceCase? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  firstEvidence  Evidence          @relation("ContradictionFirst", fields: [firstEvidenceId], references: [id], onDelete: Cascade)
+  secondEvidence Evidence          @relation("ContradictionSecond", fields: [secondEvidenceId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([firstEvidenceId])
+  @@index([secondEvidenceId])
+  @@index([createdById])
+}
+
+/// A question referred to a specialist. Many per Case, by design.
+model SpecialistEscalation {
+  id        String  @id @default(cuid())
+  caseId    String?
+  artworkId String?
+
+  categoryId     String?
+  specialistId   String?
+  specialistName String?
+
+  issue             String
+  reason            String?
+  documentsSupplied String?
+
+  requestedAt DateTime         @default(now())
+  status      EscalationStatus @default(REQUESTED)
+
+  response             String?
+  conclusion           String?
+  outstandingQuestions String?
+  completedAt          DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  case       IntelligenceCase?   @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  artwork    Artwork?            @relation(fields: [artworkId], references: [id], onDelete: SetNull)
+  category   SpecialistCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  specialist Party?              @relation(fields: [specialistId], references: [id], onDelete: SetNull)
+
+  @@index([caseId, status])
+  @@index([categoryId])
+  @@index([createdById])
+}
+
+// --- Methodology and accountability ----------------------------------------
+
+/// The version of the method a Case was prepared under.
+///
+/// Historical Cases stay linked to the version they used. Revising the method
+/// must never silently restate what an earlier Case claimed to have done.
+model MethodologyVersion {
+  id            String            @id @default(cuid())
+  versionNumber String            @unique
+  effectiveFrom DateTime
+  status        MethodologyStatus @default(DRAFT)
+  description   String?
+  approvedBy    String?
+  changeNotes   String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  assessments  Assessment[]
+  caseVersions CaseVersion[]
+
+  @@index([status, effectiveFrom])
+  @@index([createdById])
+}
+
+/// A Collector Intelligence Case.
+///
+/// The living record. What was ISSUED at any point is a CaseVersion, which is
+/// immutable - so this row may move on while every version it ever issued
+/// stands exactly as it was.
+model IntelligenceCase {
+  id        String @id @default(cuid())
+  /// Human-facing identifier, e.g. QAC-2026-014.
+  reference String @unique
+
+  title String
+  /// What the Case covers, and deliberately what it does not.
+  scope String?
+
+  /// Who it was prepared for. Optional: a Case can be opened before a
+  /// collector is attached to it.
+  collectorIntakeId String?
+
+  status CaseStatus @default(OPEN)
+
+  openedAt DateTime  @default(now())
+  issuedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  collectorIntake CollectorIntake? @relation(fields: [collectorIntakeId], references: [id], onDelete: SetNull)
+
+  artworks       CaseArtwork[]
+  evidenceLinks  CaseEvidence[]
+  parties        CaseParty[]
+  gaps           Gap[]
+  contradictions Contradiction[]
+  escalations    SpecialistEscalation[]
+  versions       CaseVersion[]
+
+  @@index([status, openedAt])
+  @@index([collectorIntakeId])
+  @@index([createdById])
+}
+
+/// One issued version of a Case. IMMUTABLE ONCE ISSUED.
+///
+/// Generating a revision INSERTS a new row. Nothing updates an issued version,
+/// which is what makes "a revised Case never destroys a previously issued one"
+/// true at the storage layer rather than by convention.
+///
+/// The narrative fields are a SNAPSHOT. The graph moves on; what was said on
+/// the day must not move with it.
+model CaseVersion {
+  id            String @id @default(cuid())
+  caseId        String
+  /// 1, 2, 3... unique within the Case.
+  versionNumber Int
+
+  /// The prose as issued.
+  summary            String?
+  decisionAssessment String?
+  uncertainties      String?
+  limitations        String?
+
+  methodologyVersionId String?
+
+  /// Named accountability, per section 5.7.
+  accountableName  String?
+  accountableRole  String?
+  accountableAt    DateTime?
+  /// How the sign-off was made: typed name, uploaded signature, external.
+  signatureMethod  String?
+  signatureAssetId String?
+
+  /// Recorded where they differ from the accountable party.
+  preparedByName String?
+  reviewedByName String?
+
+  issuedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  case               IntelligenceCase    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  methodologyVersion MethodologyVersion? @relation(fields: [methodologyVersionId], references: [id], onDelete: SetNull)
+
+  @@unique([caseId, versionNumber])
+  @@index([caseId, issuedAt])
+  @@index([createdById])
+}
+
+// --- Junctions -------------------------------------------------------------
+// Every one of these exists because the brief forbids the one-to-one it would
+// otherwise have been.
+
+/// One Case may cover several works; one work may appear in several Cases.
+model CaseArtwork {
+  id        String  @id @default(cuid())
+  caseId    String
+  artworkId String
+  /// Why this work is in this Case.
+  role      String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  case    IntelligenceCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  artwork Artwork          @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, artworkId])
+  @@index([artworkId])
+  @@index([createdById])
+}
+
+/// One item of evidence may be reviewed by several Cases.
+model CaseEvidence {
+  id         String @id @default(cuid())
+  caseId     String
+  evidenceId String
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  case     IntelligenceCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  evidence Evidence         @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, evidenceId])
+  @@index([evidenceId])
+  @@index([createdById])
+}
+
+/// THE constraint from section 5.9: one evidence supports many claims, and one
+/// claim rests on many evidence items.
+model EvidenceClaim {
+  id         String @id @default(cuid())
+  evidenceId String
+  claimId    String
+
+  /// Whether this evidence supports the claim or tells against it.
+  supports Boolean @default(true)
+  weight   String?
+  note     String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  claim    Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@unique([evidenceId, claimId])
+  @@index([claimId])
+  @@index([createdById])
+}
+
+/// An assessment may weigh several claims at once.
+model ClaimAssessment {
+  id           String @id @default(cuid())
+  claimId      String
+  assessmentId String
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  claim      Claim      @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([claimId, assessmentId])
+  @@index([assessmentId])
+  @@index([createdById])
+}
+
+/// A party's role is a property of the relationship, not of the party.
+model ArtworkParty {
+  id        String  @id @default(cuid())
+  artworkId String
+  partyId   String
+  roleId    String?
+
+  fromDate DateTime?
+  toDate   DateTime?
+  note     String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artwork Artwork    @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  party   Party      @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  role    PartyRole? @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
+  @@index([artworkId])
+  @@index([partyId])
+  @@index([createdById])
+}
+
+model CaseParty {
+  id      String  @id @default(cuid())
+  caseId  String
+  partyId String
+  roleId  String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  case  IntelligenceCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  party Party            @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  role  PartyRole?       @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
+  @@unique([caseId, partyId, roleId])
+  @@index([partyId])
+  @@index([createdById])
+}
+
+/// One document can come from several sources; one archive yields many.
+model EvidenceSource {
+  id         String @id @default(cuid())
+  evidenceId String
+  sourceId   String
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  source   Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([evidenceId, sourceId])
+  @@index([sourceId])
+  @@index([createdById])
+}
+
+model ArtworkExhibition {
+  id           String  @id @default(cuid())
+  artworkId    String
+  exhibitionId String
+  note         String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artwork    Artwork    @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  exhibition Exhibition @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
+
+  @@unique([artworkId, exhibitionId])
+  @@index([exhibitionId])
+  @@index([createdById])
+}
+
+model ArtworkPublication {
+  id            String  @id @default(cuid())
+  artworkId     String
+  publicationId String
+  page          String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artwork     Artwork     @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  publication Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+
+  @@unique([artworkId, publicationId])
+  @@index([publicationId])
+  @@index([createdById])
+}
+
+// ===========================================================================
+// Content surfaces
+//
+// Everything here exists so the words on the public sites can change without a
+// deployment. Each was previously a TypeScript file that only a developer
+// could edit, which is the thing section 18-20 asks us to stop.
+//
+// DEMO CONTENT IS MARKED IN THE DATA, not just in a comment. Every row carries
+// `isDemo`, the surfaces render a visible notice while any is present, and one
+// UPDATE clears the lot. Placeholder text that cannot be told apart from real
+// content is how a demo becomes a liability.
+// ===========================================================================
+
+model FaqCategory {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  label    String
+  ordering Int     @default(0)
+  active   Boolean @default(true)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  items FaqItem[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+model FaqItem {
+  id         String @id @default(cuid())
+  categoryId String
+
+  question String
+  answer   String
+
+  ordering  Int     @default(0)
+  published Boolean @default(false)
+  /// Written by the developers to fill the page for a demo. Not Qhakaza's
+  /// words, and the site says so while any remain.
+  isDemo    Boolean @default(false)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  category FaqCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([categoryId, ordering])
+  @@index([published])
+  @@index([createdById])
+}
+
+/// A Briefing, managed from the Command Center.
+///
+/// Distinct from the existing `NewsArticle`, which is retained: that model was
+/// built to an earlier brief and holds no rows the site reads. This one carries
+/// the fields section 19 names - subtitle, author, cover image, sources and
+/// related Briefings - and is what the site now reads.
+model Briefing {
+  id   String @id @default(cuid())
+  slug String @unique
+
+  title    String
+  subtitle String?
+  author   String?
+  category String?
+
+  /// The full text. Markdown-ish plain text; rendered as paragraphs.
+  body    String?
+  /// The summary shown in listings. Supplied for every Briefing from the start.
+  excerpt String
+
+  coverImageUrl String?
+  /// Where the claims come from. A Briefing making market claims without
+  /// sources is the thing VERA exists to argue against.
+  sources       String?
+
+  publishedAt DateTime?
+  status      ArticleStatus @default(DRAFT)
+  isDemo      Boolean       @default(false)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  relatedTo   BriefingRelation[] @relation("BriefingFrom")
+  relatedFrom BriefingRelation[] @relation("BriefingTo")
+
+  @@index([status, publishedAt])
+  @@index([createdById])
+}
+
+/// "Related Briefings", per section 19. A junction because the relationship is
+/// many-to-many and deliberately not symmetric: A may point at B without B
+/// pointing back.
+model BriefingRelation {
+  id     String @id @default(cuid())
+  fromId String
+  toId   String
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  from Briefing @relation("BriefingFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to   Briefing @relation("BriefingTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId])
+  @@index([toId])
+  @@index([createdById])
+}
+
+/// A published version of a legal document.
+///
+/// PUBLISHING A NEW VERSION NEVER DELETES A PRIOR ONE. Section 20 requires
+/// previous-version retention, and for a document people agreed to that is not
+/// a nicety: you must be able to show what someone accepted on the day they
+/// accepted it. There is no delete path anywhere for this table.
+model LegalDocumentVersion {
+  id String @id @default(cuid())
+
+  /// "TERMS" or "PRIVACY". A string rather than an enum so a third document
+  /// does not need a migration.
+  documentKey String
+
+  versionNumber String
+  effectiveFrom DateTime
+
+  title String
+  body  String
+
+  status ArticleStatus @default(DRAFT)
+  isDemo Boolean       @default(false)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  @@unique([documentKey, versionNumber])
+  @@index([documentKey, status, effectiveFrom])
+  @@index([createdById])
+}
+
+// ===========================================================================
+// VISIBILITY AND RELEASE
+//
+// Approval is not publication. Publication to one collector is not publication
+// to all. Neither is publication to the world. Those are four different facts
+// and the schema keeps them apart.
+//
+// THE FOUR QUESTIONS the brief requires to be answerable about any record are
+// answered by rows, never inferred from a status column:
+//
+//   Where is this visible?   ArtworkRelease.tier
+//   Who may see it?          Audience -> AudienceMember -> Membership
+//   Why may they see it?     ArtworkRelease.reason, .releasedById, .releasedAt
+//   Which version?           ArtworkRelease.versionLabel
+//
+// A work reaches a collector only if an un-revoked release exists to an
+// audience that collector belongs to, AND the artist granted the matching
+// permission. Both conditions live in RLS, not in a query someone must
+// remember to write.
+// ===========================================================================
+
+/// Where a record is visible. The four contexts from the brief.
+enum VisibilityTier {
+  /// The submitting artist and Qhakaza internally.
+  ARTIST_WORKING_RECORD
+  /// Qhakaza only, while evidence and presentation are reviewed.
+  INTERNAL_REVIEW
+  /// An approved, collector-safe version released to a specific audience.
+  PRIVATE_COLLECTOR_PROJECTION
+  /// Separately authorised editorial or brand use. Never inventory.
+  PUBLIC_EDITORIAL
+}
+
+/// What an artist has allowed Qhakaza to do with their material.
+///
+/// STORING SOMETHING AND BEING ALLOWED TO USE IT ARE DIFFERENT MATTERS. A work
+/// without PUBLISH_PUBLICLY can never enter a public editorial state however
+/// many people approve it - enforced in RLS, not by convention.
+enum PermissionKind {
+  STORE_MATERIAL
+  SHARE_PRIVATELY_WITH_COLLECTORS
+  USE_IN_PRIVATE_BRIEF
+  PRESENT_TO_PARTNERS
+  PUBLISH_PUBLICLY
+  PUBLISH_ARTIST_STORY
+  RETAIN_DOCUMENTATION
+}
+
+/// A named group a work can be released to.
+///
+/// A TABLE OF TYPES, not an enum, because the brief requires the list to grow.
+/// Private brief, partner programme and private experience exist now as
+/// STRUCTURAL PLACEHOLDERS - the products behind them are a later phase.
+model AudienceType {
+  id            String  @id @default(cuid())
+  slug          String  @unique
+  label         String
+  /// False where the type exists structurally but the product does not yet.
+  isLiveProduct Boolean @default(false)
+  active        Boolean @default(true)
+  ordering      Int     @default(0)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  audiences Audience[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+model Audience {
+  id     String  @id @default(cuid())
+  typeId String?
+
+  name        String
+  description String?
+  /// Retired audiences stop receiving releases without breaking history.
+  active      Boolean @default(true)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  type     AudienceType?    @relation(fields: [typeId], references: [id], onDelete: SetNull)
+  members  AudienceMember[]
+  releases ArtworkRelease[]
+
+  @@index([active])
+  @@index([typeId])
+  @@index([createdById])
+}
+
+/// Who is in an audience.
+///
+/// Membership, not User: a collector's standing with Qhakaza is what grants
+/// sight of a work, and it can lapse or be revoked independently of the account.
+model AudienceMember {
+  id           String @id @default(cuid())
+  audienceId   String
+  membershipId String
+
+  addedById String?
+  removedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  audience   Audience   @relation(fields: [audienceId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([audienceId, membershipId])
+  @@index([membershipId, removedAt])
+  @@index([createdById])
+}
+
+/// The act of releasing a work to an audience, at a tier.
+///
+/// APPEND-MOSTLY. Withdrawing sets revokedAt rather than deleting, because who
+/// could see what, and when, is provenance and feeds VERA.
+model ArtworkRelease {
+  id         String @id @default(cuid())
+  artworkId  String
+  audienceId String
+
+  tier VisibilityTier @default(PRIVATE_COLLECTOR_PROJECTION)
+
+  /// Why this audience may see it. Shown to staff, never to the collector.
+  reason       String?
+  /// Which projection of the work this release refers to.
+  versionLabel String?
+
+  releasedById String?
+  releasedAt   DateTime  @default(now())
+  revokedAt    DateTime?
+  revokedById  String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artwork  Artwork  @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  audience Audience @relation(fields: [audienceId], references: [id], onDelete: Cascade)
+
+  @@index([artworkId, revokedAt])
+  @@index([audienceId, revokedAt])
+  @@index([tier, revokedAt])
+  @@index([createdById])
+}
+
+/// An artist's explicit permission, per artwork or for the artist generally.
+///
+/// `artworkId` null means the permission covers the artist's material as a
+/// whole. A work-specific row wins over a general one.
+model ArtistPermission {
+  id        String  @id @default(cuid())
+  artistId  String
+  artworkId String?
+
+  kind    PermissionKind
+  granted Boolean
+
+  /// What the artist actually did to confirm it, in their own record.
+  confirmingAction String?
+  decidedAt        DateTime @default(now())
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artist  Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  artwork Artwork? @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  @@unique([artistId, artworkId, kind])
+  @@index([artworkId, kind, granted])
+  @@index([createdById])
+}
+
+// ===========================================================================
+// COLLECTOR PROFILE AND MATCHING
+//
+// Qhakaza matches approved work to collectors by genre and collecting
+// preference. Those preferences already existed - scattered across the intake
+// form and the Private Note, keyed by email, attached to no one. This gives
+// them a home against the membership so they can be used.
+//
+// THE SYSTEM SUGGESTS. IT NEVER RELEASES. Nothing here creates an
+// ArtworkRelease; suggestions are ranked candidates for an admin to accept or
+// ignore, and the release remains a deliberate human act.
+// ===========================================================================
+
+/// A collector's private record of preference and relationship intelligence.
+///
+/// One per membership. Populated from the intake and the Private Note today,
+/// and from the conversational agent when it replaces the form; extended into
+/// the fuller Collecting Direction in the collector-platform phase.
+model CollectorProfile {
+  id           String @id @default(cuid())
+  membershipId String @unique
+
+  /// What they collect. The matchable fields.
+  mediums String[]
+  regions String[]
+  themes  String[]
+
+  /// How they collect. Read by a person, not by the ranker.
+  motivations      String?
+  budgetLogic      String?
+  acquisitionPace  String?
+  collectingIntent String?
+  /// How settled they are in their own judgement, in Qhakaza's words.
+  confidenceLevel  String?
+  confidenceGaps   String?
+
+  /// Where this understanding came from: "intake", "private-note",
+  /// "conversation", "advisor". Free text because the list will grow.
+  sourcedFrom String?
+  /// Anything an advisor wants remembered that has no field of its own.
+  notes       String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([createdById])
+}
+
+/// A ranked suggestion an admin has been shown.
+///
+/// Recorded rather than computed and forgotten, for two reasons: an admin
+/// should see what was already suggested and dismissed, and knowing which
+/// suggestions were acted on is the only way to tell whether the ranking is
+/// any good.
+model MatchSuggestion {
+  id           String @id @default(cuid())
+  artworkId    String
+  membershipId String
+
+  /// Higher is a closer fit. Ordering only - never shown as a percentage,
+  /// because it is not a measurement of anything.
+  score     Int     @default(0)
+  /// Why this pairing surfaced, in words an advisor can weigh.
+  rationale String?
+
+  /// Set when an admin acts on it. A suggestion is never a release.
+  actedOn   Boolean   @default(false)
+  dismissed Boolean   @default(false)
+  decidedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artwork    Artwork    @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([artworkId, membershipId])
+  @@index([membershipId, score])
+  @@index([artworkId, score])
+  @@index([createdById])
 }

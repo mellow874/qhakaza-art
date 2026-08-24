@@ -41,7 +41,7 @@ export function CollectorHeader() {
             </Link>
           ))}
 
-          <Link href={APPLY_CTA.href} className={buttonStyles({ size: 'lg', className: 'caps' })}>
+          <Link href={APPLY_CTA.href} className={buttonStyles({ size: 'sm', className: 'caps' })}>
             {APPLY_CTA.label}
           </Link>
         </nav>

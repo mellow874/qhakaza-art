@@ -12,7 +12,12 @@
     "migrate": "prisma migrate dev --schema prisma/schema.prisma",
     "deploy": "prisma migrate deploy --schema prisma/schema.prisma",
     "generate": "prisma generate --schema prisma/schema.prisma",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "check:env": "tsx scripts/check-env.ts",
+    "export:schema": "tsx scripts/export-schema.ts",
+    "verify": "tsx scripts/verify-database.ts",
+    "migrate:data": "tsx scripts/migrate-data.ts",
+    "generate:rls": "tsx scripts/generate-rls.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3"
