@@ -7,6 +7,8 @@ import {
   setNoteStatus,
   setUserRole,
 } from '@/features/command-center/actions';
+import { extendCustodyPeriodAction, concludeCustodyPeriodAction } from '@/features/custody/actions';
+import { calculateTimeRemaining } from '@qhakaza/shared-db';
 import { cn } from '@qhakaza/shared-ui';
 
 import { ActionButton } from '@/features/command-center/action-button';
@@ -94,6 +96,7 @@ export function AdminCommandCenter({
   intakes,
   comms,
   privateNotes,
+  custodyPeriods,
   analytics,
   people,
   audit,
@@ -302,6 +305,66 @@ export function AdminCommandCenter({
       </Panel>
 
       <Panel
+        id="custody"
+        title="Appreciation Periods"
+        note="Works placed with collectors. Time remaining is shown at a glance. Past custodies are retained permanently as provenance."
+      >
+        {custodyPeriods.length === 0 ? (
+          <Empty>No active appreciation periods.</Empty>
+        ) : (
+          <ul className="flex flex-col">
+            {custodyPeriods.map((period) => {
+              const remaining = calculateTimeRemaining(period.startedAt, period.endsAt);
+              const collectorName =
+                period.membership.user?.name ??
+                period.membership.intake?.fullName ??
+                period.membership.user?.email ??
+                'Unknown';
+
+              return (
+                <Row key={period.id}>
+                  <span className="flex max-w-xl flex-col gap-1">
+                    <span className="text-heading">
+                      {period.artwork.title}
+                      <span className="text-muted text-sm ml-2">
+                        by {period.artwork.artist.displayName}
+                      </span>
+                    </span>
+                    <span className="text-muted text-xs">
+                      Placed with {collectorName} · {period.durationDays} days
+                      {period.extensionDays && ` + ${period.extensionDays} extended`}
+                    </span>
+                    <span className="text-body text-sm">
+                      {remaining.daysRemaining} days remaining
+                      {remaining.isOverdue && ' (overdue)'}
+                    </span>
+                  </span>
+                  <span className="flex flex-wrap gap-2">
+                    <ActionButton
+                      label="Extend"
+                      action={extendCustodyPeriodAction.bind(null, {
+                        custodyPeriodId: period.id,
+                        extensionDays: 14,
+                        extensionReason: 'Extended by administrator',
+                      })}
+                    />
+                    <ActionButton
+                      label="Conclude early"
+                      confirm="End this appreciation period now? The record is retained permanently."
+                      action={concludeCustodyPeriodAction.bind(null, {
+                        custodyPeriodId: period.id,
+                        concludeReason: 'Concluded by administrator',
+                      })}
+                    />
+                  </span>
+                </Row>
+              );
+            })}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel
         id="private-notes"
         title="Private Notes"
         note="What prospective collectors told us they are drawn to. Read these before preparing anything for them — that is what they are for."
@@ -404,7 +467,7 @@ export function AdminCommandCenter({
       </Panel>
 
       <Panel id="figures" title="Where things stand" note="Counted from the records, live. Nothing here is a stored total.">
-        <div className="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-5">
           {[
             ['Invitations outstanding', dashboard.invitations.outstanding],
             ['Onboarded', dashboard.invitations.completed],
@@ -418,6 +481,7 @@ export function AdminCommandCenter({
             ['Specialist reviews outstanding', dashboard.evidence.escalationsOutstanding],
             ['Cases open', dashboard.cases.total],
             ['Case versions issued', dashboard.cases.issuedVersions],
+            ['Active custodies', custodyPeriods.length],
           ].map(([label, value]) => (
             <div key={String(label)} className="bg-canvas flex flex-col gap-1 p-4">
               <span className="font-display text-heading text-2xl tabular-nums">{value}</span>

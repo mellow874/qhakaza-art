@@ -77,6 +77,9 @@ export const CORE_ENTITIES = [
   'AuditLog',
   'ActivationAttempt',
   'Partner',
+
+  // Collector custody
+  'CustodyPeriod',
 ] as const;
 
 export type CoreEntity = (typeof CORE_ENTITIES)[number];
@@ -166,6 +169,9 @@ export const ENTITY_DOMAIN = {
   DailyMetric: 'platform',
   AuditLog: 'platform',
   Partner: 'platform',
+
+  // Collector custody: staff-managed, collector-facing provenance.
+  CustodyPeriod: 'collector',
 } as const satisfies Record<CoreEntity, 'supply' | 'collector' | 'platform'>;
 
 /** Entities Vera must never be able to touch, in any way, at all. */
@@ -205,6 +211,7 @@ export {
   ArticleStatus,
   ArtStatus,
   CollectorIntakeStatus,
+  CustodyPeriodStatus,
   InvitationStatus,
   MembershipStatus,
   NoteStatus,

@@ -217,6 +217,17 @@ enum PartnerStatus {
   DORMANT
 }
 
+/// The lifecycle of a collector appreciation period.
+///
+/// ACTIVE     the work is with the collector
+/// CONCLUDED  the period ended naturally or was concluded early
+/// EXTENDED   the period was extended by an administrator
+enum CustodyPeriodStatus {
+  ACTIVE
+  CONCLUDED
+  EXTENDED
+}
+
 // ---------------------------------------------------------------------------
 // Identity
 // ---------------------------------------------------------------------------
@@ -313,6 +324,7 @@ model Artwork {
   transactions ProvenanceTransaction[]
   favorites    Favorite[]
   notes        PrivateNoteSubmission[]
+  custodies    CustodyPeriod[]
 
   @@index([artistId])
   @@index([status])
@@ -419,6 +431,7 @@ model Membership {
   audiences   AudienceMember[]
   profile     CollectorProfile?
   suggestions MatchSuggestion[]
+  custodies   CustodyPeriod[]
 
   @@index([status])
   @@index([userId])
@@ -714,6 +727,78 @@ model PrivateNoteSubmission {
 
   @@index([status, createdAt])
   @@index([membershipId])
+  @@index([createdById])
+}
+
+/// A collector appreciation period — the time a work spends with a collector
+/// before it is concluded.
+///
+/// PROVENANCE RECORD. Past custodies are retained permanently against the
+/// artwork. This is provenance information and feeds into VERA in due course.
+/// Every row is append-only in spirit: concluded custodies are never deleted.
+///
+/// RESTRICTS RELEASE. A work with an active CustodyPeriod cannot be released
+/// to a second collector at the same time. Enforced at the application layer.
+///
+/// AVOIDS loan, rental, return terminology. The collector-facing language is
+/// "appreciation period" and "placed with" — pending Qhakaza confirmation.
+model CustodyPeriod {
+  id String @id @default(cuid())
+
+  artworkId  String
+  membershipId String
+
+  status CustodyPeriodStatus @default(ACTIVE)
+
+  /// The administrator-set duration in days. No fixed term across the
+  /// platform; each custody has its own, with a configurable default.
+  durationDays Int
+
+  /// When the appreciation period began.
+  startedAt DateTime @default(now())
+
+  /// When the period is due to end. Calculated from startedAt + durationDays
+  /// at creation; updated if extended.
+  endsAt DateTime
+
+  /// When the period actually concluded (naturally or early).
+  concludedAt DateTime?
+
+  /// The admin or advisor who concluded the period early.
+  concludedById String?
+  /// Why the period was concluded early, if it was.
+  concludeReason String?
+
+  /// When an extension was granted. The previous endsAt becomes the
+  /// historical record; a new endsAt is set.
+  extendedAt DateTime?
+  /// The admin or advisor who granted the extension.
+  extendedById String?
+
+  /// How many days were added by the extension, if any.
+  extensionDays Int?
+  /// Why the period was extended.
+  extensionReason String?
+
+  /// Interval in days between reminders, set by the administrator.
+  /// Null means no reminders configured.
+  reminderIntervalDays Int?
+
+  /// Free-text context about this placement.
+  notes String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artwork    Artwork    @relation(fields: [artworkId], references: [id], onDelete: Restrict)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Restrict)
+
+  /// One active custody per artwork. Enforced at the application layer
+  /// and checked before every creation.
+  @@index([status, endsAt])
+  @@index([membershipId])
+  @@index([artworkId])
   @@index([createdById])
 }
 

@@ -19,6 +19,7 @@ export function PrivateChrome({ token, children }: { token: string; children: Re
   const links = [
     { href: base, label: 'Overview' },
     { href: `${base}/discover`, label: 'Discover' },
+    { href: `${base}/custody`, label: 'Appreciation' },
     { href: `${base}/enquiries`, label: 'Enquiries' },
   ];
 

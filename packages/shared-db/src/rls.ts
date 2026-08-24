@@ -86,6 +86,7 @@ export const OWNERSHIP: Partial<Record<CoreEntity, string>> = {
   Artwork: `"artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)`,
   Membership: `"userId" = %UID%`,
   PrivateNoteSubmission: `"membershipId" IN (SELECT "id" FROM "Membership" WHERE "userId" = %UID%)`,
+  CustodyPeriod: `"membershipId" IN (SELECT "id" FROM "Membership" WHERE "userId" = %UID%)`,
 };
 
 /**
@@ -576,6 +577,14 @@ export const RLS_MATRIX = {
   PrivateNoteSubmission: {
     select: { admin: true, advisor: true, collector: 'own' },
     insert: { admin: true, advisor: true, collector: true },
+    update: { admin: true, advisor: true },
+    delete: {},
+  },
+  CustodyPeriod: {
+    // Staff manage; the collector sees their own custodies. Collectors
+    // cannot create, extend or conclude — that is staff-only.
+    select: { admin: true, advisor: true, collector: 'own' },
+    insert: { admin: true, advisor: true },
     update: { admin: true, advisor: true },
     delete: {},
   },

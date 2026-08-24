@@ -200,6 +200,48 @@ function people(tx: Tx) {
   });
 }
 
+/**
+ * Active appreciation periods, with time remaining at a glance.
+ *
+ * Provenance: past custodies are retained permanently against the artwork.
+ * This feeds VERA in due course.
+ */
+async function custodyPeriods(tx: Tx) {
+  const periods = await tx.custodyPeriod.findMany({
+    where: { status: { in: ['ACTIVE', 'EXTENDED'] } },
+    select: {
+      id: true,
+      status: true,
+      durationDays: true,
+      startedAt: true,
+      endsAt: true,
+      extendedAt: true,
+      extensionDays: true,
+      extensionReason: true,
+      reminderIntervalDays: true,
+      notes: true,
+      artwork: {
+        select: {
+          id: true,
+          title: true,
+          medium: true,
+          artist: { select: { displayName: true, slug: true } },
+        },
+      },
+      membership: {
+        select: {
+          id: true,
+          user: { select: { id: true, name: true, email: true } },
+          intake: { select: { fullName: true } },
+        },
+      },
+    },
+    orderBy: { endsAt: 'asc' },
+  });
+
+  return periods;
+}
+
 /** The audit trail. Append-only: RLS grants no UPDATE or DELETE to any role. */
 function auditTrail(tx: Tx) {
   return tx.auditLog.findMany({
@@ -350,6 +392,7 @@ export async function getCommandCentreData(actor: AuditActor) {
     intakes: await intakeQueue(tx),
     comms: await communications(tx),
     privateNotes: await privateNotes(tx),
+    custodyPeriods: await custodyPeriods(tx),
     analytics: await analytics(tx),
     people: await people(tx),
     audit: await auditTrail(tx),
