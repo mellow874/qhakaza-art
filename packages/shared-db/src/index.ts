@@ -15,6 +15,7 @@ export * from './token';
 export * from './invitation-lifecycle';
 export * from './actor';
 export * from './rls';
+export * from './permission';
 export * from './matching';
 // Test helpers. Exported because the app suites import them across packages.
 export * from './test-visibility';

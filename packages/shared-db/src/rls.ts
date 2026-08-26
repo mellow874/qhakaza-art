@@ -86,6 +86,47 @@ export const OWNERSHIP: Partial<Record<CoreEntity, string>> = {
   Artwork: `"artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)`,
   Membership: `"userId" = %UID%`,
   PrivateNoteSubmission: `"membershipId" IN (SELECT "id" FROM "Membership" WHERE "userId" = %UID%)`,
+
+  // --- The artist record -----------------------------------------------
+  //
+  // Every one of these hangs off `artistId`, so ownership is the same
+  // subquery throughout. Written out per entity rather than shared, because a
+  // helper here would obscure which tables an artist can actually reach.
+  ArtistMedium: `"artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)`,
+  ArtistExhibition: `"artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)`,
+  ArtistRepresentation: `"artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)`,
+  CvEntry: `"artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)`,
+  InstitutionalSignal: `"artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)`,
+  ArtistLink: `"artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)`,
+
+  // A declaration may hang off the artist or off one of their works.
+  DeclaredPrice: `"artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)
+     OR "artworkId" IN (SELECT "id" FROM "Artwork"
+                         WHERE "artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%))`,
+
+  /*
+   * MediaAsset ownership, which did not previously exist.
+   *
+   * The artist grant on this table was `true` - unconditional - so any signed-in
+   * artist could read EVERY row, including evidence documents, contracts and
+   * identity documents belonging to other artists. The comment above the policy
+   * said "artists write their own uploads and read them back", which is what it
+   * was meant to do and not what it did.
+   *
+   * An artist now reaches a file if they uploaded it, or if it is attached to
+   * their own artist record or one of their own works. The subqueries read
+   * Artist and Artwork, both of which an artist may select for their own rows,
+   * so no definer function is needed here.
+   */
+  MediaAsset: `"uploadedById" = %UID%
+     OR ("subjectType" = 'Artist'  AND "subjectId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%))
+     OR ("subjectType" = 'Artwork' AND "subjectId" IN (SELECT "id" FROM "Artwork"
+                                                        WHERE "artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)))`,
+
+  // Same shape: a link is the artist's if what it points at is.
+  DocumentLink: `("subjectType" = 'Artist'  AND "subjectId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%))
+     OR ("subjectType" = 'Artwork' AND "subjectId" IN (SELECT "id" FROM "Artwork"
+                                                        WHERE "artistId" IN (SELECT "id" FROM "Artist" WHERE "userId" = %UID%)))`,
 };
 
 /**
@@ -439,7 +480,14 @@ export const RLS_MATRIX = {
   // visitor sees PUBLISHED rows and nothing else, so an unfinished Briefing or
   // an unpublished Terms revision cannot leak by guessing a URL.
   FaqCategory: {
-    select: { admin: true, advisor: true, analyst: true, artist: true, collector: true, public: true },
+    select: {
+      admin: true,
+      advisor: true,
+      analyst: true,
+      artist: true,
+      collector: true,
+      public: true,
+    },
     insert: { admin: true },
     update: { admin: true },
     delete: {},
@@ -471,7 +519,14 @@ export const RLS_MATRIX = {
     delete: {},
   },
   BriefingRelation: {
-    select: { admin: true, advisor: true, analyst: true, artist: true, collector: true, public: true },
+    select: {
+      admin: true,
+      advisor: true,
+      analyst: true,
+      artist: true,
+      collector: true,
+      public: true,
+    },
     insert: { admin: true, advisor: true },
     update: { admin: true, advisor: true },
     delete: {},
@@ -558,9 +613,14 @@ export const RLS_MATRIX = {
     // Collectors are NOT granted a read: released artwork images are served
     // through the artwork record, and a collector who could read this table
     // directly could enumerate evidence documents by changing an id.
-    select: { admin: true, advisor: true, artist: true },
-    insert: { admin: true, advisor: true, artist: true },
-    update: { admin: true, advisor: true, artist: true },
+    //
+    // `artist` was `true` here, which meant unconditional - every artist could
+    // read every file in the platform, other artists' contracts and identity
+    // documents included. It is now 'own'; see MediaAsset in OWNERSHIP.
+    // `analyst` is added because evidence work needs the documents.
+    select: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    insert: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    update: { admin: true, advisor: true, analyst: true, artist: 'own' },
     // Never. Section 23 requires files to stay retrievable; withdrawal is a
     // status change, not a delete.
     delete: {},
@@ -572,6 +632,204 @@ export const RLS_MATRIX = {
     insert: { admin: true, advisor: true, system: true },
     update: {},
     delete: {},
+  },
+
+  // === Artist Intelligence Platform =======================================
+
+  /*
+   * The configurable vocabulary.
+   *
+   * READ BY EVERYONE WHO HAS TO CHOOSE FROM A LIST, including artists, whose
+   * own forms are built from it. WRITTEN BY ADMINS ONLY - not advisors. These
+   * lists are the shape of the record: an advisor quietly adding a medium or
+   * an exhibition type changes what every downstream assessment means, and
+   * that is a decision with an owner.
+   *
+   * Nothing here is deletable. A vocabulary term that has been used is part of
+   * the rows that used it; `active = false` removes it from the pickers and
+   * leaves history legible. A DELETE would either fail on the foreign key or
+   * silently orphan a fact.
+   */
+  Medium: {
+    select: { admin: true, advisor: true, analyst: true, artist: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  ExhibitionType: {
+    select: { admin: true, advisor: true, analyst: true, artist: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  SignalType: {
+    select: { admin: true, advisor: true, analyst: true, artist: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  CvEntryType: {
+    select: { admin: true, advisor: true, analyst: true, artist: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  RepresentationType: {
+    select: { admin: true, advisor: true, analyst: true, artist: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  DocumentType: {
+    select: { admin: true, advisor: true, analyst: true, artist: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+  /*
+   * READINESS CRITERIA ARE STAFF-ONLY, artists included in the exclusion.
+   *
+   * Confirmed by Qhakaza as absolute: readiness is never visible to the artist.
+   * That has to cover the CRITERIA and not only the ratings - a list of what
+   * an artist is judged on is most of the assessment, and an artist who could
+   * read it would be reading the framework. `artist` is absent here and on
+   * both assessment tables, so an artist session gets nothing from any of the
+   * three even if a query asks.
+   */
+  ReadinessCriterion: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true },
+    update: { admin: true },
+    delete: {},
+  },
+
+  /*
+   * The artist's own record.
+   *
+   * The artist owns these rows and maintains them; staff read them to assess
+   * and may correct them. Collectors appear nowhere: nothing here is released
+   * material, and what a collector eventually sees is a curated projection
+   * built by Qhakaza, never a direct read of the working record.
+   *
+   * NOBODY DELETES. Each of these carries `removedAt`: a claim that was made
+   * and later withdrawn is itself part of the record, and a row that can
+   * vanish cannot be reconciled against an assessment that relied on it.
+   * Withdrawal is an UPDATE, which the artist may perform on their own rows.
+   */
+  ArtistMedium: {
+    select: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    insert: { admin: true, advisor: true, artist: 'own' },
+    update: { admin: true, advisor: true, artist: 'own' },
+    delete: {},
+  },
+  ArtistExhibition: {
+    select: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    insert: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    update: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    delete: {},
+  },
+  ArtistRepresentation: {
+    select: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    insert: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    update: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    delete: {},
+  },
+  CvEntry: {
+    select: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    insert: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    update: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    delete: {},
+  },
+  InstitutionalSignal: {
+    select: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    insert: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    update: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    delete: {},
+  },
+  ArtistLink: {
+    select: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    insert: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    update: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    delete: {},
+  },
+
+  /*
+   * Pricing history. APPEND-ONLY: no update, no delete, for anyone.
+   *
+   * The point of the table is that a figure once declared cannot be quietly
+   * revised. Correcting a price means declaring a new one, which is also how
+   * it works in life. Enforced at the grant level too - see the hardening
+   * migration.
+   */
+  DeclaredPrice: {
+    select: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    insert: { admin: true, advisor: true, artist: 'own' },
+    update: {},
+    delete: {},
+  },
+
+  /*
+   * Qhakaza's judgement about an artist. NOT the artist's material, and never
+   * theirs to read - see ReadinessCriterion above.
+   *
+   * Append-only for the same reason as pricing: an assessment that can be
+   * rewritten is not a record of what was decided. A revised view supersedes
+   * its predecessor and leaves it standing, which is the same pattern
+   * CaseVersion already uses.
+   */
+  ReadinessAssessment: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: {},
+    delete: {},
+  },
+  ReadinessRating: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: {},
+    delete: {},
+  },
+
+  /*
+   * Field-level history. Append-only, staff-read.
+   *
+   * Not readable by the artist even for their own record: the rows carry who
+   * changed what, and staff corrections to an artist's claims are internal
+   * working material. An artist asking what their record says is answered by
+   * the record, not by the diff.
+   */
+  RecordChange: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true, artist: true },
+    update: {},
+    delete: {},
+  },
+
+  /*
+   * A document's attachments. An artist reaches a link when the thing it
+   * points at is theirs; see DocumentLink in OWNERSHIP.
+   *
+   * Detaching is a real operation rather than a historical falsification - a
+   * document attached to the wrong work should come off it - so DELETE is
+   * granted to admins. The FILE itself is still never deleted.
+   */
+  DocumentLink: {
+    select: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    insert: { admin: true, advisor: true, analyst: true, artist: 'own' },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: { admin: true },
+  },
+
+  /*
+   * Citations. Staff only, and deliberately not visible to the artist: which
+   * sources Qhakaza consulted, and what they said, is the intelligence work
+   * itself rather than the artist's own material.
+   */
+  SourceReference: {
+    select: { admin: true, advisor: true, analyst: true },
+    insert: { admin: true, advisor: true, analyst: true },
+    update: { admin: true, advisor: true, analyst: true },
+    delete: { admin: true },
   },
   PrivateNoteSubmission: {
     select: { admin: true, advisor: true, collector: 'own' },

@@ -1,4 +1,4 @@
-import { withActor } from '@qhakaza/shared-db';
+import { artworkPermissionGranted, withActor } from '@qhakaza/shared-db';
 
 /**
  * What a member is allowed to see.
@@ -53,18 +53,16 @@ export function releasedToCollector(userId: string) {
         },
       },
     },
-    // Work-specific or artist-wide, as above.
-    OR: [
-      { permissions: { some: { kind: 'SHARE_PRIVATELY_WITH_COLLECTORS', granted: true } } },
-      {
-        artist: {
-          permissions: {
-            some: { kind: 'SHARE_PRIVATELY_WITH_COLLECTORS', granted: true, artworkId: null },
-          },
-        },
-      },
-    ],
-  } as const;
+    /*
+     * The artist's permission, under the conflict rule: granted by something
+     * that applies here and denied by nothing that applies here.
+     *
+     * Previously an OR over granting rows only, so an artist-wide grant showed
+     * a collector a work the artist had specifically withheld. See
+     * `artworkPermissionGranted` for the rule and why it lives in one place.
+     */
+    ...artworkPermissionGranted('SHARE_PRIVATELY_WITH_COLLECTORS'),
+  };
 }
 
 export async function getReleasedArtworks({

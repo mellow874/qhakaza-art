@@ -76,6 +76,33 @@ export const CORE_ENTITIES = [
   'DailyMetric',
   'AuditLog',
   'ActivationAttempt',
+  // --- Artist Intelligence Platform ---------------------------------------
+  //
+  // Configurable vocabulary. Readable by everyone who has to choose from a
+  // list; writable only by admins, because these lists are the shape of the
+  // record and an advisor quietly adding a medium changes what the data means.
+  'Medium',
+  'ExhibitionType',
+  'SignalType',
+  'CvEntryType',
+  'RepresentationType',
+  'DocumentType',
+  'ReadinessCriterion',
+
+  // The record itself.
+  'ArtistMedium',
+  'ArtistExhibition',
+  'ArtistRepresentation',
+  'CvEntry',
+  'InstitutionalSignal',
+  'ArtistLink',
+  'DeclaredPrice',
+  'ReadinessAssessment',
+  'ReadinessRating',
+  'RecordChange',
+  'DocumentLink',
+  'SourceReference',
+
   'Partner',
 ] as const;
 
@@ -166,6 +193,38 @@ export const ENTITY_DOMAIN = {
   DailyMetric: 'platform',
   AuditLog: 'platform',
   Partner: 'platform',
+
+  // --- Artist Intelligence Platform ---------------------------------------
+  //
+  // The vocabulary is reference data: it describes the world, not any
+  // particular artist, so it is 'platform'.
+  Medium: 'platform',
+  ExhibitionType: 'platform',
+  SignalType: 'platform',
+  CvEntryType: 'platform',
+  RepresentationType: 'platform',
+  DocumentType: 'platform',
+  ReadinessCriterion: 'platform',
+
+  // The artist's own record. 'supply' throughout - these are the artist's
+  // material, and an artist reaches their own rows through OWNERSHIP.
+  ArtistMedium: 'supply',
+  ArtistExhibition: 'supply',
+  ArtistRepresentation: 'supply',
+  CvEntry: 'supply',
+  InstitutionalSignal: 'supply',
+  ArtistLink: 'supply',
+  DeclaredPrice: 'supply',
+
+  // Qhakaza's judgement ABOUT an artist, which is not the artist's material
+  // and is never theirs to read. 'platform' rather than 'supply' for that
+  // reason - the domain label is the first place the distinction is stated.
+  ReadinessAssessment: 'platform',
+  ReadinessRating: 'platform',
+
+  RecordChange: 'platform',
+  DocumentLink: 'supply',
+  SourceReference: 'platform',
 } as const satisfies Record<CoreEntity, 'supply' | 'collector' | 'platform'>;
 
 /** Entities Vera must never be able to touch, in any way, at all. */

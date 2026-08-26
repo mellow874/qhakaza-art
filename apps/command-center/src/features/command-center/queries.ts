@@ -273,9 +273,7 @@ async function dashboard(tx: Tx) {
    * so a role that may not read Evidence counts zero of them rather than
    * seeing a total it should not.
    */
-  const [row] = await tx.$queryRawUnsafe<
-    Record<string, bigint>[]
-  >(`
+  const [row] = await tx.$queryRawUnsafe<Record<string, bigint>[]>(`
     SELECT
       (SELECT count(*) FROM "MemberInvitation" WHERE "status" IN ('CREATED','SENT','OPENED'))      AS inv_outstanding,
       (SELECT count(*) FROM "MemberInvitation" WHERE "status" = 'ACCEPTED')                        AS inv_accepted,

@@ -1,4 +1,4 @@
-import { Prisma, prisma } from '@qhakaza/shared-db';
+import { Prisma, artworkPermissionGranted, prisma } from '@qhakaza/shared-db';
 
 const DEFAULT_WORK_LIMIT = 8;
 const DEFAULT_ARTIST_LIMIT = 3;
@@ -34,15 +34,15 @@ export const PUBLICLY_VISIBLE_WORK: Prisma.ArtworkWhereInput = {
     some: { tier: 'PUBLIC_EDITORIAL', revokedAt: null },
   },
   /*
-   * A permission may be work-specific OR cover the artist's material as a
-   * whole (artworkId null). The `permissions` relation on Artwork only sees
-   * the first kind, so both are spelled out - matching what the RLS function
-   * does. Getting this wrong hid every legitimately released work.
+   * The artist's permission to publish, under the conflict rule: granted by
+   * something that applies here, and denied by nothing that applies here.
+   *
+   * This was spelled out inline and was wrong - it tested only for a granting
+   * row, so an artist-wide grant published a work the artist had specifically
+   * asked be held back. The rule now lives in one place; see
+   * `artworkPermissionGranted`.
    */
-  OR: [
-    { permissions: { some: { kind: 'PUBLISH_PUBLICLY', granted: true } } },
-    { artist: { permissions: { some: { kind: 'PUBLISH_PUBLICLY', granted: true, artworkId: null } } } },
-  ],
+  ...artworkPermissionGranted('PUBLISH_PUBLICLY'),
 };
 
 /*
