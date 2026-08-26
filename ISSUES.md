@@ -41,9 +41,14 @@ that project is superseded anyway, rotating its password costs nothing.
 [`apps/vera/src/content/faq.ts`](apps/vera/src/content/faq.ts) is an empty array
 because the supplied design showed the accordion's dividers but no legible text.
 
-Needs: the actual questions and answers, or a decision to drop the page.
-Answers about pricing, subscriptions or regulatory status are factual claims
-about the business and will not be invented.
+Needs: the actual questions and answers. Answers about pricing, subscriptions
+or regulatory status are factual claims about the business and will not be
+invented.
+
+**No longer needs a developer.** The FAQ is now editable in the Command Center
+under *Content*, including adding categories. What remains is placeholder text
+written by us to fill the page; that screen counts it at the top and the flag
+clears the moment Qhakaza writes over it.
 
 ### B4 — What should appear first on the Command Center?
 
@@ -65,9 +70,15 @@ terms of service are legal instruments describing what this business actually
 does with personal data and on what terms it trades. Inventing them would state
 obligations the company has not agreed to, and visitors would rely on it.
 
-Needs: the real documents, from whoever advises Qhakaza on this. Then replace
-`LegalPlaceholder` in the two routes. The collector app has no such links yet
-and will need the same pair before launch.
+Needs: the real documents, from whoever advises Qhakaza on this.
+
+**No longer needs a developer.** Both are now published from the Command Center
+under *Content → Terms & privacy*. Publishing writes a new version and archives
+the one it replaces rather than editing it, because you have to be able to show
+what someone agreed to on the day they agreed to it.
+
+The collector app has no such links yet and will need the same pair before
+launch.
 
 ### B5 — Provisional financial bands
 
@@ -137,16 +148,6 @@ nothing is broken — but it should exist before launch.
 Invitations are shown on screen for an operator to copy. Contact messages,
 intakes and Private Notes are stored and never sent. No provider is configured.
 
-### I7 — No rate limiting
-
-Public forms and `/private/<token>` accept unlimited attempts. Failed
-activations are recorded but not slowed.
-
-### I8 — Analytics tables are never written
-
-`AnalyticsEvent` and `DailyMetric` have no writer, so those Command Center
-panels are honestly empty rather than showing invented figures.
-
 ---
 
 ### B10 - Which audience types are live products, and which are placeholders
@@ -175,6 +176,37 @@ have been looked at.
 ---
 
 ## Closed
+
+### I7 — No rate limiting — **fixed**
+
+Public forms and `/private/<token>` accepted unlimited attempts; failed
+activations were recorded but never slowed. A database-backed fixed-window
+limiter now covers the contact form, collector intake and invitation
+activation.
+
+In the database rather than in memory because each Vercel instance has its own
+memory, where a limiter counts a fraction of the requests and lets the rest
+through — worse than none, because it reads as a control and is not one.
+
+Activation is checked *before* the token is examined, and a blocked attempt is
+still written to `ActivationAttempt` under a new `RATE_LIMITED` outcome.
+Dropping it would mean the forensic log goes quiet exactly when it becomes
+interesting.
+
+### I8 — Analytics tables are never written — **fixed**
+
+`AnalyticsEvent` now has a writer, through a closed event vocabulary in
+`packages/shared-db/src/analytics.ts`. An open recorder becomes a hundred
+ad-hoc names within a year, at which point nobody can answer what is being
+collected — which is the question this platform above all has to be able to
+answer about itself.
+
+Business events only. No page tracking, no session stitching, no behavioural
+profile of anybody. An intake event carries no properties at all, because the
+payload behind it is income bands and free text about someone's wealth.
+
+`DailyMetric` still has no writer and its panel stays honestly empty.
+
 
 ### C10 - Eight tables were readable through Supabase's public API - **fixed**
 
