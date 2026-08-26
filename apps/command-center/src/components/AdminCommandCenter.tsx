@@ -124,6 +124,18 @@ export function AdminCommandCenter({
             Artist records
           </Link>
           <Link
+            href="/artworks"
+            className="text-accent-ink caps text-xs underline-offset-4 hover:underline"
+          >
+            Works
+          </Link>
+          <Link
+            href="/content"
+            className="text-accent-ink caps text-xs underline-offset-4 hover:underline"
+          >
+            Content
+          </Link>
+          <Link
             href="/lists"
             className="text-accent-ink caps text-xs underline-offset-4 hover:underline"
           >

@@ -474,6 +474,37 @@ export function ArtistDossierView({
         )}
       </Section>
 
+      <Section title="Work">
+        {dossier.artworks.length === 0 ? (
+          <Empty>Nothing submitted yet.</Empty>
+        ) : (
+          <ul className="border-line/70 flex flex-col border-t">
+            {dossier.artworks.map((work) => (
+              <li key={work.id} className="border-line/70 border-b py-3">
+                {/* Each work has its own record - provenance, documents and
+                    sources live there rather than being flattened in here. */}
+                <a
+                  href={`/artworks/${work.id}`}
+                  className="hover:text-accent flex flex-wrap items-baseline justify-between gap-3"
+                >
+                  <span className="flex flex-col gap-1">
+                    <span className="text-heading text-sm">{work.title}</span>
+                    <span className="text-muted text-xs">
+                      {[work.medium, work.status].filter(Boolean).join(' · ')}
+                    </span>
+                  </span>
+                  <span className="text-muted text-xs">
+                    {work._count.transactions === 0
+                      ? 'No provenance'
+                      : `${work._count.transactions} provenance links`}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
       <PermissionsPanel
         dossier={dossier}
         canSet={canSetPermissions}
