@@ -12,8 +12,13 @@ vi.mock('next/headers', () => ({
 }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
-const { addInternalNote, editInternalNote, listInternalNotes, returnForInformation, setArtworkStatus } =
-  await import('./actions');
+const {
+  addInternalNote,
+  editInternalNote,
+  listInternalNotes,
+  returnForInformation,
+  setArtworkStatus,
+} = await import('./actions');
 
 /**
  * The artwork review workflow and internal notes.
@@ -103,7 +108,9 @@ describe('setArtworkStatus', () => {
     const result = await setArtworkStatus({ artworkId: work.id, status: 'PUBLISHED' });
 
     expect(result.ok).toBe(false);
-    expect((await prisma.artwork.findUniqueOrThrow({ where: { id: work.id } })).status).toBe('DRAFT');
+    expect((await prisma.artwork.findUniqueOrThrow({ where: { id: work.id } })).status).toBe(
+      'DRAFT',
+    );
   });
 
   it.each(['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'REJECTED'])(
@@ -123,7 +130,9 @@ describe('setArtworkStatus', () => {
     const result = await setArtworkStatus({ artworkId: work.id, status: 'PUBLISHED' });
 
     expect(result).toMatchObject({ ok: false });
-    expect((await prisma.artwork.findUniqueOrThrow({ where: { id: work.id } })).status).toBe('APPROVED');
+    expect((await prisma.artwork.findUniqueOrThrow({ where: { id: work.id } })).status).toBe(
+      'APPROVED',
+    );
   });
 
   it('records the transition in the audit trail', async () => {
@@ -175,7 +184,9 @@ describe('setArtworkStatus', () => {
     auth.mockResolvedValue({ user: { id: artistId, role: 'ARTIST' } });
 
     expect((await setArtworkStatus({ artworkId: work.id, status: 'APPROVED' })).ok).toBe(false);
-    expect((await prisma.artwork.findUniqueOrThrow({ where: { id: work.id } })).status).toBe('SUBMITTED');
+    expect((await prisma.artwork.findUniqueOrThrow({ where: { id: work.id } })).status).toBe(
+      'SUBMITTED',
+    );
   });
 });
 
@@ -210,7 +221,9 @@ describe('returnForInformation', () => {
   it('will not return a work that is already published', async () => {
     const work = await makeArtwork('PUBLISHED');
 
-    expect((await returnForInformation({ artworkId: work.id, request: 'Something' })).ok).toBe(false);
+    expect((await returnForInformation({ artworkId: work.id, request: 'Something' })).ok).toBe(
+      false,
+    );
   });
 });
 
@@ -229,9 +242,9 @@ describe('internal notes', () => {
   });
 
   it('refuses an empty note', async () => {
-    expect((await addInternalNote({ subjectType: 'Artist', subjectId: artistId, body: '   ' })).ok).toBe(
-      false,
-    );
+    expect(
+      (await addInternalNote({ subjectType: 'Artist', subjectId: artistId, body: '   ' })).ok,
+    ).toBe(false);
   });
 
   it('keeps the previous text when a note is edited', async () => {

@@ -110,7 +110,9 @@ export async function getRecipientTypes() {
  * whose link the admin can copy. Email is best-effort by design — the platform
  * must work before the provider is connected.
  */
-export async function createInvitation(input: unknown): Promise<
+export async function createInvitation(
+  input: unknown,
+): Promise<
   InvitationResult<{ invitationId: string; link: string; emailed: boolean; emailError?: string }>
 > {
   const actor = commandCentreActor(await auth());
@@ -319,9 +321,7 @@ export async function resendInvitation(input: {
 }
 
 /** Withdraw an invitation that has not been accepted. Takes effect at once. */
-export async function cancelInvitation(input: {
-  invitationId: string;
-}): Promise<InvitationResult> {
+export async function cancelInvitation(input: { invitationId: string }): Promise<InvitationResult> {
   const actor = commandCentreActor(await auth());
   if (isFailure(actor)) return { ok: false, error: actor.error };
 

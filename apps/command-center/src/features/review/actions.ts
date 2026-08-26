@@ -21,8 +21,7 @@ import { commandCentreActor, isFailure, performAudited, readAs } from '@/lib/aud
  */
 
 export type ReviewResult<T = undefined> =
-  | ({ ok: true } & (T extends undefined ? object : T))
-  | { ok: false; error: string };
+  ({ ok: true } & (T extends undefined ? object : T)) | { ok: false; error: string };
 
 /** Which statuses each transition may be applied from. */
 const ALLOWED_FROM = {
@@ -167,7 +166,12 @@ export async function returnForInformation(input: {
         });
 
         await tx.artworkReviewRequest.create({
-          data: { artworkId: artwork.id, request, requestedById: actor.userId, createdById: actor.userId },
+          data: {
+            artworkId: artwork.id,
+            request,
+            requestedById: actor.userId,
+            createdById: actor.userId,
+          },
         });
       },
     });
@@ -271,7 +275,12 @@ export async function editInternalNote(input: {
       summary: 'Note edited',
       run: async (tx) => {
         await tx.internalNoteRevision.create({
-          data: { noteId: note.id, previousBody: note.body, editedById: actor.userId, createdById: actor.userId },
+          data: {
+            noteId: note.id,
+            previousBody: note.body,
+            editedById: actor.userId,
+            createdById: actor.userId,
+          },
         });
         await tx.internalNote.update({ where: { id: note.id }, data: { body } });
       },

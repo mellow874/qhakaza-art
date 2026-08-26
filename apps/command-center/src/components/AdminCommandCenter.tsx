@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import {
   decideCollectorIntake,
   inviteCollector,
@@ -108,6 +110,26 @@ export function AdminCommandCenter({
           recorded in the audit trail.
         </p>
         <p className="text-muted caps mt-2">Signed in as {actorRole}</p>
+
+        {/*
+          The artist records and the vocabulary behind them. Separate pages
+          rather than more panels here: this page is already the operational
+          queue, and an artist record is something you sit with.
+        */}
+        <nav className="mt-4 flex flex-wrap gap-4">
+          <Link
+            href="/artists"
+            className="text-accent-ink caps text-xs underline-offset-4 hover:underline"
+          >
+            Artist records
+          </Link>
+          <Link
+            href="/lists"
+            className="text-accent-ink caps text-xs underline-offset-4 hover:underline"
+          >
+            Lists
+          </Link>
+        </nav>
       </header>
 
       <Panel
@@ -403,8 +425,12 @@ export function AdminCommandCenter({
         )}
       </Panel>
 
-      <Panel id="figures" title="Where things stand" note="Counted from the records, live. Nothing here is a stored total.">
-        <div className="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-4">
+      <Panel
+        id="figures"
+        title="Where things stand"
+        note="Counted from the records, live. Nothing here is a stored total."
+      >
+        <div className="bg-line grid gap-px sm:grid-cols-2 lg:grid-cols-4">
           {[
             ['Invitations outstanding', dashboard.invitations.outstanding],
             ['Onboarded', dashboard.invitations.completed],
