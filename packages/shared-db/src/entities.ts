@@ -102,6 +102,7 @@ export const CORE_ENTITIES = [
   'RecordChange',
   'DocumentLink',
   'SourceReference',
+  'RateLimitCounter',
 
   'Partner',
 ] as const;
@@ -225,6 +226,7 @@ export const ENTITY_DOMAIN = {
   RecordChange: 'platform',
   DocumentLink: 'supply',
   SourceReference: 'platform',
+  RateLimitCounter: 'platform',
 } as const satisfies Record<CoreEntity, 'supply' | 'collector' | 'platform'>;
 
 /** Entities Vera must never be able to touch, in any way, at all. */

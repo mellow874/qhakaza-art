@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 
 import { auth } from '@qhakaza/shared-auth/server';
 import { fingerprintToken, requireRole, requireToken } from '@qhakaza/shared-auth/guards';
-import { asSystem } from '@qhakaza/shared-db';
+import { asSystem, checkLimit, recordEvent } from '@qhakaza/shared-db';
 import type { ActivationOutcome } from '@qhakaza/shared-db';
 
 /**
@@ -67,10 +67,37 @@ async function recordAttempt(input: {
 }
 
 export async function activate(token: string | undefined): Promise<ActivationResult> {
+  /*
+   * RATE LIMITED BEFORE THE TOKEN IS EVEN LOOKED AT.
+   *
+   * Repeated attempts here are what token guessing looks like, and until now
+   * the platform recorded them faithfully and did nothing to slow them down.
+   * The check comes first so a guesser is stopped rather than merely
+   * catalogued.
+   *
+   * A DENIAL IS STILL RECORDED. Being rate limited is itself an activation
+   * attempt worth having in the forensic record - dropping it would mean the
+   * one signal that matters most, sustained guessing, is the one that stops
+   * being written down.
+   */
+  const headerList = await headers();
+  const caller = headerList.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const limit = await checkLimit('activation', caller);
+
+  if (!limit.allowed) {
+    await recordAttempt({
+      outcome: 'RATE_LIMITED',
+      tokenFingerprint: token ? fingerprintToken(token) : 'none',
+    });
+    await recordEvent('rate_limit.tripped', { properties: { action: 'activation' } });
+    return { status: 'denied' };
+  }
+
   const result = await requireToken(token);
 
   if (!result.ok) {
     await recordAttempt({ outcome: result.reason, tokenFingerprint: result.fingerprint });
+    await recordEvent('invitation.failed', { properties: { reason: result.reason } });
     return { status: 'denied' };
   }
 
@@ -97,6 +124,7 @@ export async function activate(token: string | undefined): Promise<ActivationRes
     tokenFingerprint: fingerprintToken(token!),
     invitationId: result.invitationId,
   });
+  await recordEvent('invitation.accepted');
 
   return {
     status: 'granted',

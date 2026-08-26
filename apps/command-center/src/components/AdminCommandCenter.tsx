@@ -449,7 +449,12 @@ export function AdminCommandCenter({
             ['Artists awaiting approval', dashboard.artists.awaiting],
             ['Artwork submitted', dashboard.artwork.SUBMITTED ?? 0],
             ['Artwork under review', dashboard.artwork.UNDER_REVIEW ?? 0],
-            ['Artwork published', dashboard.artwork.PUBLISHED ?? 0],
+            // "Published" counted a status no work has held since the
+            // visibility rework, so this tile read 0 forever. Two tiles now,
+            // because they answer different questions: ready to place, and
+            // actually in front of somebody.
+            ['Ready to place', dashboard.artwork.COLLECTOR_READY ?? 0],
+            ['Placed with collectors', dashboard.artwork.RELEASED ?? 0],
             ['Evidence records', dashboard.evidence.records],
             ['Open gaps', dashboard.evidence.openGaps],
             ['Unresolved contradictions', dashboard.evidence.unresolvedContradictions],

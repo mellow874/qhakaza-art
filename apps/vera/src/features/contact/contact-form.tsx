@@ -61,6 +61,16 @@ export function ContactForm({
         setValues(EMPTY);
       } else if (result.fieldErrors) {
         setErrors(result.fieldErrors);
+      } else if (result.error === 'RATE_LIMITED') {
+        /*
+         * Its own message, because the generic one tells the reader to try
+         * again and trying again is exactly what will not work. Someone who
+         * has genuinely sent several messages deserves to be told why, not
+         * left thinking the form is broken.
+         */
+        setFormError(
+          'You have sent us several messages just now. Please give it an hour, or email us directly if it is urgent.',
+        );
       } else {
         setFormError('We could not send your message. Please try again.');
       }

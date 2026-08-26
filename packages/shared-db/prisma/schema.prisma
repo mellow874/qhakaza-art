@@ -196,6 +196,14 @@ enum ActivationOutcome {
   EXPIRED_TOKEN
   REVOKED_TOKEN
   ROLE_DENIED
+
+  /// Turned away by the rate limiter before the token was examined.
+  ///
+  /// Recorded rather than dropped: sustained guessing is the single most
+  /// important thing this table exists to show, and it is precisely the
+  /// pattern that trips the limiter. Losing these rows would mean the log
+  /// went quiet at the moment it became interesting.
+  RATE_LIMITED
 }
 
 enum ArticleStatus {
@@ -2556,7 +2564,7 @@ model ArtistMedium {
   /// made and later retracted is itself part of the record, and a row that
   /// can vanish cannot be reconciled against an assessment that relied on
   /// it. Every read of this table filters on it.
-  removedAt   DateTime?
+  removedAt DateTime?
 
   createdAt   DateTime @default(now()) @map("created_date")
   updatedAt   DateTime @updatedAt @map("updated_date")
@@ -2598,7 +2606,7 @@ model ArtistExhibition {
   /// made and later retracted is itself part of the record, and a row that
   /// can vanish cannot be reconciled against an assessment that relied on
   /// it. Every read of this table filters on it.
-  removedAt   DateTime?
+  removedAt DateTime?
 
   createdAt   DateTime @default(now()) @map("created_date")
   updatedAt   DateTime @updatedAt @map("updated_date")
@@ -2645,7 +2653,7 @@ model ArtistRepresentation {
   /// made and later retracted is itself part of the record, and a row that
   /// can vanish cannot be reconciled against an assessment that relied on
   /// it. Every read of this table filters on it.
-  removedAt   DateTime?
+  removedAt DateTime?
 
   createdAt   DateTime @default(now()) @map("created_date")
   updatedAt   DateTime @updatedAt @map("updated_date")
@@ -2690,7 +2698,7 @@ model CvEntry {
   /// made and later retracted is itself part of the record, and a row that
   /// can vanish cannot be reconciled against an assessment that relied on
   /// it. Every read of this table filters on it.
-  removedAt   DateTime?
+  removedAt DateTime?
 
   createdAt   DateTime @default(now()) @map("created_date")
   updatedAt   DateTime @updatedAt @map("updated_date")
@@ -2733,7 +2741,7 @@ model InstitutionalSignal {
   /// made and later retracted is itself part of the record, and a row that
   /// can vanish cannot be reconciled against an assessment that relied on
   /// it. Every read of this table filters on it.
-  removedAt   DateTime?
+  removedAt DateTime?
 
   createdAt   DateTime @default(now()) @map("created_date")
   updatedAt   DateTime @updatedAt @map("updated_date")
@@ -2770,7 +2778,7 @@ model ArtistLink {
   /// made and later retracted is itself part of the record, and a row that
   /// can vanish cannot be reconciled against an assessment that relied on
   /// it. Every read of this table filters on it.
-  removedAt   DateTime?
+  removedAt DateTime?
 
   createdAt   DateTime @default(now()) @map("created_date")
   updatedAt   DateTime @updatedAt @map("updated_date")
@@ -2961,7 +2969,7 @@ model DocumentLink {
   /// made and later retracted is itself part of the record, and a row that
   /// can vanish cannot be reconciled against an assessment that relied on
   /// it. Every read of this table filters on it.
-  removedAt   DateTime?
+  removedAt DateTime?
 
   createdAt   DateTime @default(now()) @map("created_date")
   updatedAt   DateTime @updatedAt @map("updated_date")
@@ -3013,4 +3021,35 @@ model SourceReference {
   @@index([subjectType, subjectId])
   @@index([sourceId])
   @@index([createdById])
+}
+
+/// A fixed-window request counter, for rate limiting.
+///
+/// IN THE DATABASE RATHER THAN IN MEMORY, because the apps run on Vercel where
+/// each serverless instance has its own memory. An in-memory limiter there
+/// counts a fraction of the requests and lets the rest through, which is worse
+/// than none: it reads as a control and is not one.
+///
+/// FIXED WINDOW, not sliding, and worth being honest about. A caller can send
+/// the limit twice across a window boundary. That is an acceptable trade for a
+/// counter that costs one upsert and needs no background sweep, given what
+/// this protects: public forms against flooding, not an API against a
+/// determined attacker.
+///
+/// Rows are written with no actor, from `asSystem` - rate limiting happens
+/// before anyone is authenticated, which is exactly when it matters.
+model RateLimitCounter {
+  id String @id @default(cuid())
+
+  /// What is being limited and by whom: "contact:203.0.113.5". The value is
+  /// hashed at the call site where it carries personal data.
+  bucket      String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  createdAt DateTime @default(now()) @map("created_date")
+  updatedAt DateTime @updatedAt @map("updated_date")
+
+  @@unique([bucket, windowStart])
+  @@index([windowStart])
 }

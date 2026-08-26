@@ -35,8 +35,23 @@ async function vettingQueue(tx: Tx) {
       orderBy: { createdAt: 'asc' },
       take: 25,
     }),
+    /*
+     * WORK READY TO PLACE, AND NOT YET PLACED.
+     *
+     * This read `status: { not: 'PUBLISHED' }`, which was correct before the
+     * visibility rework and has been wrong since. PUBLISHED is a deprecated
+     * status that no work now holds, so the queue matched EVERY work - drafts
+     * an artist is still writing, archived pieces, and work already placed
+     * with a collector. A queue that lists everything is not a queue.
+     *
+     * "Not released" is now what it actually means: no un-revoked release
+     * exists. And only work that has got through review can be placed at all.
+     */
     tx.artwork.findMany({
-      where: { status: { not: 'PUBLISHED' } },
+      where: {
+        status: { in: ['APPROVED', 'COLLECTOR_READY'] },
+        releases: { none: { revokedAt: null } },
+      },
       select: {
         id: true,
         title: true,
@@ -146,10 +161,13 @@ function privateNotes(tx: Tx) {
 /**
  * Analytics.
  *
- * Reads whatever has been recorded. Nothing writes AnalyticsEvent or
- * DailyMetric yet, so those panels are honestly empty rather than filled with
- * invented figures — a dashboard showing made-up numbers is worse than one
- * showing none.
+ * Business events are now recorded - see  in shared-db. This
+ * panel was empty for two cycles not because nothing had happened but because
+ * nothing ever wrote a row, which is a worse kind of empty than it looked.
+ *
+ * DailyMetric is still unwritten, and its panel stays honestly empty rather
+ * than filled with invented figures. A dashboard showing made-up numbers is
+ * worse than one showing none.
  */
 async function analytics(tx: Tx) {
   const [events, metrics, attempts, counts] = await Promise.all([
@@ -173,7 +191,10 @@ async function analytics(tx: Tx) {
     Promise.all([
       tx.artist.count(),
       tx.artist.count({ where: { approved: true } }),
-      tx.artwork.count({ where: { status: 'PUBLISHED' } }),
+      // Released means a live release exists, not a status. The old
+      // `status: 'PUBLISHED'` count has been structurally zero since the
+      // visibility rework, so this figure was quietly always 0.
+      tx.artwork.count({ where: { releases: { some: { revokedAt: null } } } }),
       tx.collectorIntake.count(),
       tx.membership.count({ where: { status: 'ACTIVE' } }),
     ]),
@@ -287,7 +308,10 @@ async function dashboard(tx: Tx) {
       (SELECT count(*) FROM "Artwork" WHERE "status" = 'UNDER_REVIEW')                             AS art_under_review,
       (SELECT count(*) FROM "Artwork" WHERE "status" = 'RETURNED_FOR_INFORMATION')                 AS art_returned,
       (SELECT count(*) FROM "Artwork" WHERE "status" = 'APPROVED')                                 AS art_approved,
-      (SELECT count(*) FROM "Artwork" WHERE "status" = 'PUBLISHED')                                AS art_published,
+      (SELECT count(*) FROM "Artwork" WHERE "status" = 'COLLECTOR_READY')                          AS art_collector_ready,
+      (SELECT count(*) FROM "Artwork" a
+         WHERE EXISTS (SELECT 1 FROM "ArtworkRelease" r
+                        WHERE r."artworkId" = a."id" AND r."revokedAt" IS NULL))                  AS art_released,
       (SELECT count(*) FROM "Artwork" WHERE "status" = 'REJECTED')                                 AS art_rejected,
       (SELECT count(*) FROM "Evidence")                                                            AS evidence_records,
       (SELECT count(*) FROM "Gap" WHERE "status" IN ('OPEN','IN_PROGRESS'))                        AS gaps_open,
@@ -318,7 +342,11 @@ async function dashboard(tx: Tx) {
       UNDER_REVIEW: n('art_under_review'),
       RETURNED_FOR_INFORMATION: n('art_returned'),
       APPROVED: n('art_approved'),
-      PUBLISHED: n('art_published'),
+      // Two different questions, and they were previously one wrong answer.
+      // COLLECTOR_READY is a state a work is in; released is whether anyone
+      // can actually see it.
+      COLLECTOR_READY: n('art_collector_ready'),
+      RELEASED: n('art_released'),
       REJECTED: n('art_rejected'),
     } as Record<string, number>,
     evidence: {

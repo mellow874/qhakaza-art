@@ -67,7 +67,10 @@ function normalise(values: readonly (string | null | undefined)[]): string[] {
     .map((value) => value.trim().toLowerCase());
 }
 
-function overlap(a: readonly (string | null | undefined)[], b: readonly (string | null | undefined)[]) {
+function overlap(
+  a: readonly (string | null | undefined)[],
+  b: readonly (string | null | undefined)[],
+) {
   const right = new Set(normalise(b));
   return [...new Set(normalise(a))].filter((value) => right.has(value));
 }
@@ -114,7 +117,10 @@ export function rankCollectorsForWork(
   return collectors
     .map((collector) => ({ ...scoreMatch(work, collector, weights), collector }))
     .filter((match) => match.score > 0)
-    .sort((a, b) => b.score - a.score || a.collector.membershipId.localeCompare(b.collector.membershipId));
+    .sort(
+      (a, b) =>
+        b.score - a.score || a.collector.membershipId.localeCompare(b.collector.membershipId),
+    );
 }
 
 /** Work that might suit a collector, best first. */
@@ -137,7 +143,11 @@ export function rankWorksForCollector(
  * neither supplied stays empty rather than being guessed at.
  */
 export function profileFromSources(input: {
-  intake?: { preferredMediums?: string[]; country?: string | null; collectingGoal?: string | null } | null;
+  intake?: {
+    preferredMediums?: string[];
+    country?: string | null;
+    collectingGoal?: string | null;
+  } | null;
   note?: {
     mediums?: string[];
     regions?: string[];
@@ -158,8 +168,15 @@ export function profileFromSources(input: {
     .filter(Boolean);
 
   return {
-    mediums: [...new Set([...(input.note?.mediums ?? []), ...(input.intake?.preferredMediums ?? [])])],
-    regions: [...new Set([...(input.note?.regions ?? []), ...(input.intake?.country ? [input.intake.country] : [])])],
+    mediums: [
+      ...new Set([...(input.note?.mediums ?? []), ...(input.intake?.preferredMediums ?? [])]),
+    ],
+    regions: [
+      ...new Set([
+        ...(input.note?.regions ?? []),
+        ...(input.intake?.country ? [input.intake.country] : []),
+      ]),
+    ],
     themes,
     motivations: input.note?.building ?? input.intake?.collectingGoal ?? null,
     budgetLogic: input.note?.budgetBand ?? null,

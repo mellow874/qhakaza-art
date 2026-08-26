@@ -299,7 +299,10 @@ describe('constraint 5: conclusions never overwrite earlier ones', () => {
 
     await prisma.contradiction.update({
       where: { id: contradiction.id },
-      data: { resolution: 'The invoice is primary; the catalogue was reprinted.', resolvedAt: new Date() },
+      data: {
+        resolution: 'The invoice is primary; the catalogue was reprinted.',
+        resolvedAt: new Date(),
+      },
     });
 
     const after = await prisma.contradiction.findUniqueOrThrow({
@@ -318,7 +321,12 @@ describe('constraint 5: conclusions never overwrite earlier ones', () => {
     });
     const subject = await makeCase('QAC-2026-006');
     await prisma.caseVersion.create({
-      data: { caseId: subject.id, versionNumber: 1, methodologyVersionId: original.id, issuedAt: new Date() },
+      data: {
+        caseId: subject.id,
+        versionNumber: 1,
+        methodologyVersionId: original.id,
+        issuedAt: new Date(),
+      },
     });
 
     // The method moves on.
@@ -351,7 +359,9 @@ describe('the reasoning path is reconstructible', () => {
 
     await prisma.evidenceSource.create({ data: { evidenceId: evidence.id, sourceId: source.id } });
     await prisma.evidenceClaim.create({ data: { evidenceId: evidence.id, claimId: claim.id } });
-    await prisma.claimAssessment.create({ data: { claimId: claim.id, assessmentId: assessment.id } });
+    await prisma.claimAssessment.create({
+      data: { claimId: claim.id, assessmentId: assessment.id },
+    });
 
     const gapType = await prisma.gapType.findFirstOrThrow({ where: { slug: 'WEAK_EVIDENCE' } });
     await prisma.gap.create({
@@ -439,7 +449,12 @@ describe('section 22: an analyst works Cases and cannot read collector data', ()
     // previously issued version".
     const subject = await makeCase('QAC-2026-008');
     const version = await prisma.caseVersion.create({
-      data: { caseId: subject.id, versionNumber: 1, decisionAssessment: 'As issued.', issuedAt: new Date() },
+      data: {
+        caseId: subject.id,
+        versionNumber: 1,
+        decisionAssessment: 'As issued.',
+        issuedAt: new Date(),
+      },
     });
 
     const { count } = await as('admin', 'admin-1', (tx) =>
@@ -451,7 +466,8 @@ describe('section 22: an analyst works Cases and cannot read collector data', ()
 
     expect(count).toBe(0);
     expect(
-      (await prisma.caseVersion.findUniqueOrThrow({ where: { id: version.id } })).decisionAssessment,
+      (await prisma.caseVersion.findUniqueOrThrow({ where: { id: version.id } }))
+        .decisionAssessment,
     ).toBe('As issued.');
   });
 });

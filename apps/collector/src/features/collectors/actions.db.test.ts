@@ -1,4 +1,15 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+/*
+ * The public forms are rate limited, and the limiter reads the forwarded
+ * address to tell callers apart. Server-side `headers()` has no request store
+ * in a test, so it is stubbed with a fixed address - which also means every
+ * case here shares one bucket, and the reset below keeps them from consuming
+ * each other's allowance.
+ */
+vi.mock('next/headers', () => ({
+  headers: async () => new Map([['x-forwarded-for', '203.0.113.5']]) as unknown as Headers,
+}));
 
 import { apply } from '@/content/collectors';
 import { prisma } from '@qhakaza/shared-db';

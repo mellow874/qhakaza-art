@@ -831,6 +831,28 @@ export const RLS_MATRIX = {
     update: { admin: true, advisor: true, analyst: true },
     delete: { admin: true },
   },
+
+  /*
+   * Rate limit counters.
+   *
+   * `system` ONLY, plus admins to look. Rate limiting runs before anyone is
+   * authenticated - that is precisely when it matters - so it is written
+   * through `asSystem`, the same narrow context the invitation door uses.
+   *
+   * DELIBERATELY NOT READABLE BY `public`. The bucket key identifies the
+   * caller - hashed, but still a per-caller record - so anonymous read would
+   * hand out a list of who has been hitting which form.
+   *
+   * `system` holds DELETE too, because `pruneRateLimits` runs unattended with
+   * no actor. This is the one table in the matrix where a closed window being
+   * deleted loses nothing: it is a counter, not a record of anything.
+   */
+  RateLimitCounter: {
+    select: { admin: true, system: true },
+    insert: { admin: true, system: true },
+    update: { admin: true, system: true },
+    delete: { admin: true, system: true },
+  },
   PrivateNoteSubmission: {
     select: { admin: true, advisor: true, collector: 'own' },
     insert: { admin: true, advisor: true, collector: true },

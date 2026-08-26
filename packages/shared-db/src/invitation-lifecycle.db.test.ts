@@ -93,7 +93,9 @@ describe('markInvitationOpened', () => {
     const first = await prisma.memberInvitation.findUniqueOrThrow({ where: { id: invitation.id } });
 
     await markInvitationOpened(invitation.id);
-    const second = await prisma.memberInvitation.findUniqueOrThrow({ where: { id: invitation.id } });
+    const second = await prisma.memberInvitation.findUniqueOrThrow({
+      where: { id: invitation.id },
+    });
 
     expect(second.openedAt).toEqual(first.openedAt);
   });
@@ -234,7 +236,9 @@ describe('completeInvitation', () => {
     await completeInvitation(invitation.id);
     const first = await prisma.memberInvitation.findUniqueOrThrow({ where: { id: invitation.id } });
     await completeInvitation(invitation.id);
-    const second = await prisma.memberInvitation.findUniqueOrThrow({ where: { id: invitation.id } });
+    const second = await prisma.memberInvitation.findUniqueOrThrow({
+      where: { id: invitation.id },
+    });
 
     expect(second.completedAt).toEqual(first.completedAt);
   });

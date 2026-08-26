@@ -31,8 +31,8 @@ export function LegalPlaceholder({ title, kind }: { title: string; kind: string 
         nothing than publish a document that does not accurately describe how we operate.
       </p>
       <p className="text-body leading-relaxed">
-        If you need to know how we handle your information before that is published, ask us
-        directly and we will answer.
+        If you need to know how we handle your information before that is published, ask us directly
+        and we will answer.
       </p>
       <div className="mt-2 flex flex-wrap gap-4">
         <Link href="/contact" className={buttonStyles({ size: 'md' })}>

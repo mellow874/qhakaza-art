@@ -4,8 +4,7 @@ import { prisma } from '@qhakaza/shared-db';
 import { privateRequestSchema } from '@/lib/validation/request';
 
 export type PrivateRequestResult =
-  | { ok: true }
-  | { ok: false; error: 'INVALID' | 'UNKNOWN'; fieldErrors?: Record<string, string> };
+  { ok: true } | { ok: false; error: 'INVALID' | 'UNKNOWN'; fieldErrors?: Record<string, string> };
 
 /**
  * Submits a private collector enquiry.

@@ -57,10 +57,7 @@ export function BriefingCard({ briefing }: { briefing: Briefing }) {
 
         <p className="text-body text-sm leading-relaxed">{briefing.excerpt}</p>
 
-        <time
-          dateTime={briefing.publishedAt?.toISOString()}
-          className="text-muted mt-4 text-sm"
-        >
+        <time dateTime={briefing.publishedAt?.toISOString()} className="text-muted mt-4 text-sm">
           {briefing.publishedAt?.toLocaleDateString('en-ZA', {
             day: 'numeric',
             month: 'long',
