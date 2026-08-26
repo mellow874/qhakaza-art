@@ -1,4 +1,4 @@
-import { artworkPermissionGranted, withActor } from '@qhakaza/shared-db';
+import { Prisma, artworkPermissionGranted, withActor } from '@qhakaza/shared-db';
 
 /**
  * What a member is allowed to see.
@@ -37,7 +37,20 @@ import { artworkPermissionGranted, withActor } from '@qhakaza/shared-db';
  * conditions independently, so a caller who forgot to scope would get nothing
  * rather than everything.
  */
-export function releasedToCollector(userId: string) {
+/*
+ * ANNOTATED, not inferred, and not `as const`.
+ *
+ * This used to end in `as const`, which was what made the literal
+ * 'PRIVATE_COLLECTOR_PROJECTION' narrow to the enum rather than widening to
+ * string. Spreading the shared permission predicate in is incompatible with
+ * that - a spread of a typed value cannot live inside an `as const` object and
+ * keep both halves - and without either, inference degraded far enough that
+ * `findMany` stopped resolving its own `select` and callers lost `artist`.
+ *
+ * Declaring the return type does the same job as `as const` did and says what
+ * the value is for.
+ */
+export function releasedToCollector(userId: string): Prisma.ArtworkWhereInput {
   return {
     releases: {
       some: {
