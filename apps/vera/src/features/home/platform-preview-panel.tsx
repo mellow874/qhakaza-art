@@ -32,7 +32,10 @@ export function PlatformPreviewPanel() {
             key={work.reference}
             className="border-line/50 flex items-center gap-4 border-b py-5 last:border-b-0"
           >
-            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-sm" aria-hidden="true">
+            <div
+              className="relative h-10 w-10 shrink-0 overflow-hidden rounded-sm"
+              aria-hidden="true"
+            >
               <Image src={work.image} alt="" fill className="object-cover" sizes="40px" />
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">

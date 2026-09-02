@@ -102,12 +102,23 @@ function ProfileStanding({ artist }: { artist: Studio['artist'] }) {
           : 'Qhakaza is reviewing your profile. You can submit work now — it will be held until your profile is approved.'}
       </p>
 
-      <Link
-        href="/artist/onboarding"
-        className={buttonStyles({ variant: 'secondary', size: 'sm', className: 'self-start' })}
-      >
-        Edit profile
-      </Link>
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/artist/onboarding"
+          className={buttonStyles({ variant: 'secondary', size: 'sm' })}
+        >
+          Edit profile
+        </Link>
+
+        {/*
+          The record is where the depth lives - biography, exhibitions,
+          representation, CV. The profile above is only the name and statement,
+          so this is the more substantial of the two and says what it is for.
+        */}
+        <Link href="/artist/record" className={buttonStyles({ variant: 'secondary', size: 'sm' })}>
+          Your record
+        </Link>
+      </div>
     </div>
   );
 }
@@ -185,8 +196,7 @@ export function Studio({ artist, artworks }: Studio) {
                       </span>
                     )}
 
-                    {(work.status === 'DRAFT' ||
-                      work.status === 'RETURNED_FOR_INFORMATION') && (
+                    {(work.status === 'DRAFT' || work.status === 'RETURNED_FOR_INFORMATION') && (
                       <Link
                         href={`/artist/work/${work.id}`}
                         className="text-accent caps mt-2 w-fit text-xs hover:underline"

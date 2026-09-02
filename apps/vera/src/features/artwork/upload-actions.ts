@@ -105,11 +105,20 @@ export async function requestUpload(input: {
     return { ok: false, error: 'The upload could not be started. Please try again.' };
   }
 
-  const asset = await withActor({ role: 'artist', userId: artist.userId }, (tx) =>
-    tx.mediaAsset.create({
+  const asset = await withActor({ role: 'artist', userId: artist.userId }, async (tx) => {
+    // What the file IS. An artwork photograph is the one document type that
+    // can be inferred safely - it was uploaded against a work and it is an
+    // image. Everything else is chosen by whoever uploads it.
+    const imageType = await tx.documentType.findUnique({
+      where: { slug: 'artwork-image' },
+      select: { id: true },
+    });
+
+    const created = await tx.mediaAsset.create({
       data: {
         subjectType: 'Artwork',
         subjectId: input.artworkId,
+        documentTypeId: imageType?.id ?? null,
         bucket: signed.value.bucket,
         storagePath: path,
         originalFilename: input.filename.slice(0, 255),
@@ -117,14 +126,36 @@ export async function requestUpload(input: {
         sizeBytes: input.sizeBytes,
         status: 'PENDING',
         // An artwork photograph becomes public when the work is released.
-        // Evidence documents, added in a later phase, default to INTERNAL.
+        // Typed supporting documents default to INTERNAL - see DocumentType.
         confidentiality: 'PUBLIC',
         uploadedById: artist.userId,
         createdById: artist.userId,
       },
       select: { id: true },
-    }),
-  );
+    });
+
+    /*
+     * The attachment, as a link row.
+     *
+     * The two columns above still say where the file came from, but every
+     * query now reads attachments through DocumentLink so that one document
+     * can evidence several records. A file created without a link would be
+     * invisible to those queries - the migration backfilled the existing rows,
+     * and new ones have to make their own.
+     */
+    await tx.documentLink.create({
+      data: {
+        mediaAssetId: created.id,
+        subjectType: 'Artwork',
+        subjectId: input.artworkId,
+        role: 'Artwork image',
+        primaryLink: true,
+        createdById: artist.userId,
+      },
+    });
+
+    return created;
+  });
 
   return {
     ok: true,

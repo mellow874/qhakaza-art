@@ -1,4 +1,4 @@
-import { Prisma, prisma } from '@qhakaza/shared-db';
+import { Prisma, artworkPermissionGranted, decidePermission, prisma } from '@qhakaza/shared-db';
 
 const DEFAULT_WORK_LIMIT = 8;
 const DEFAULT_ARTIST_LIMIT = 3;
@@ -34,15 +34,15 @@ export const PUBLICLY_VISIBLE_WORK: Prisma.ArtworkWhereInput = {
     some: { tier: 'PUBLIC_EDITORIAL', revokedAt: null },
   },
   /*
-   * A permission may be work-specific OR cover the artist's material as a
-   * whole (artworkId null). The `permissions` relation on Artwork only sees
-   * the first kind, so both are spelled out - matching what the RLS function
-   * does. Getting this wrong hid every legitimately released work.
+   * The artist's permission to publish, under the conflict rule: granted by
+   * something that applies here, and denied by nothing that applies here.
+   *
+   * This was spelled out inline and was wrong - it tested only for a granting
+   * row, so an artist-wide grant published a work the artist had specifically
+   * asked be held back. The rule now lives in one place; see
+   * `artworkPermissionGranted`.
    */
-  OR: [
-    { permissions: { some: { kind: 'PUBLISH_PUBLICLY', granted: true } } },
-    { artist: { permissions: { some: { kind: 'PUBLISH_PUBLICLY', granted: true, artworkId: null } } } },
-  ],
+  ...artworkPermissionGranted('PUBLISH_PUBLICLY'),
 };
 
 /*
@@ -162,6 +162,31 @@ export async function getArtistBySlug(slug: string) {
       displayName: true,
       slug: true,
       statement: true,
+
+      /*
+       * THE PUBLIC BIOGRAPHY ONLY.
+       *
+       * `biographyInternal` is in this same row and must never be selected
+       * here. RLS is row-level, not column-level: the policy lets an anonymous
+       * reader see the row of an approved artist, and this whitelist is the
+       * only thing keeping the internal half of the record off the public
+       * site. `public-projection.db.test.ts` asserts it.
+       */
+      biographyPublic: true,
+      practice: true,
+
+      /*
+       * Whether the artist has agreed to their story being published, which is
+       * a separate permission from publishing their work. Fetched rather than
+       * filtered on, because an artist who has not granted it still has a
+       * public page - it just carries their statement and their work, not
+       * their biography.
+       */
+      permissions: {
+        where: { kind: 'PUBLISH_ARTIST_STORY' },
+        select: { artworkId: true, granted: true, expiresAt: true },
+      },
+
       artworks: {
         where: PUBLICLY_VISIBLE_WORK,
         orderBy: { createdAt: 'desc' },
@@ -175,9 +200,16 @@ export async function getArtistBySlug(slug: string) {
   if (!artist) return null;
 
   // ArtCard wants the artist on each work; it is the same artist throughout.
-  const { artworks, ...rest } = artist;
+  const { artworks, permissions, biographyPublic, practice, ...rest } = artist;
+
+  // The story is published only if the artist said it could be. Withheld
+  // rather than half-shown: a biography is theirs, not Qhakaza's.
+  const storyPermitted = decidePermission(permissions, null);
+
   return {
     ...rest,
+    biographyPublic: storyPermitted ? biographyPublic : null,
+    practice: storyPermitted ? practice : null,
     artworks: artworks.map((work) => ({
       ...work,
       artist: { displayName: artist.displayName, slug: artist.slug },

@@ -1,10 +1,23 @@
 'use server';
 
-import { prisma } from '@qhakaza/shared-db';
+import { headers } from 'next/headers';
+
+import { checkLimit, prisma, recordEvent } from '@qhakaza/shared-db';
 import { collectorApplicationSchema } from '@/lib/validation/collector';
 
 export type CollectorApplicationResult =
-  { ok: true } | { ok: false; error: 'INVALID' | 'UNKNOWN'; fieldErrors?: Record<string, string> };
+  | { ok: true }
+  | {
+      ok: false;
+      error: 'INVALID' | 'RATE_LIMITED' | 'UNKNOWN';
+      fieldErrors?: Record<string, string>;
+    };
+
+/** Who is asking, for rate limiting only. Never treated as an identity. */
+async function callerHint(): Promise<string> {
+  const headerList = await headers();
+  return headerList.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+}
 
 /**
  * Records a collector membership application.
@@ -30,6 +43,14 @@ export async function submitCollectorApplication(
     return { ok: false, error: 'INVALID', fieldErrors };
   }
 
+  // After validation, so a malformed submission does not consume a real
+  // applicant's allowance while they are correcting it.
+  const limit = await checkLimit('intake', await callerHint());
+  if (!limit.allowed) {
+    await recordEvent('rate_limit.tripped', { properties: { action: 'intake' } });
+    return { ok: false, error: 'RATE_LIMITED' };
+  }
+
   try {
     /*
      * `createMany`, not `create`.
@@ -41,6 +62,12 @@ export async function submitCollectorApplication(
      * `createMany` returns a count and asks for nothing it cannot have.
      */
     await prisma.collectorIntake.createMany({ data: [parsed.data] });
+    /*
+     * No properties at all on this one. An intake carries income bands and
+     * free text about someone's wealth; the only safe thing to record is that
+     * one arrived.
+     */
+    await recordEvent('intake.submitted');
     return { ok: true };
   } catch (error) {
     console.error('submitCollectorApplication failed', error);

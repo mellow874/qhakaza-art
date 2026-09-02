@@ -178,9 +178,9 @@ describe('releaseArtwork', () => {
 
     auth.mockResolvedValue({ user: { id: 'someone', role: 'COLLECTOR' } });
 
-    expect((await releaseArtwork({ artworkId: artwork.id, audienceId: created.audienceId })).ok).toBe(
-      false,
-    );
+    expect(
+      (await releaseArtwork({ artworkId: artwork.id, audienceId: created.audienceId })).ok,
+    ).toBe(false);
   });
 });
 

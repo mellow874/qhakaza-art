@@ -67,9 +67,7 @@ function required(name: string): string {
  * live Supabase.
  */
 export function appDatabaseUrl(): string {
-  return currentEnvironment() === 'test'
-    ? required('TEST_DATABASE_URL')
-    : required('DATABASE_URL');
+  return currentEnvironment() === 'test' ? required('TEST_DATABASE_URL') : required('DATABASE_URL');
 }
 
 /** The URL migrations connect with. Falls back to the app URL only locally. */

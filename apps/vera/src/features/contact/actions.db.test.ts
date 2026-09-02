@@ -1,4 +1,14 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+/*
+ * The contact form is rate limited, and the limiter reads the forwarded
+ * address to tell callers apart. Server-side `headers()` has no request store
+ * in a test, so it is stubbed with a fixed address. Every case here therefore
+ * shares one bucket, which resetDb clears between them.
+ */
+vi.mock('next/headers', () => ({
+  headers: async () => new Map([['x-forwarded-for', '203.0.113.5']]) as unknown as Headers,
+}));
 
 import { prisma } from '@qhakaza/shared-db';
 import { resetDb } from '@tests/helpers/db';

@@ -12,6 +12,14 @@ import type { Role } from '@qhakaza/shared-auth';
  * in the tests as well as in the app.
  */
 export async function resetDb() {
+  /*
+   * Rate limit counters first. Every test stubs the same forwarded address, so
+   * they share one bucket - and a suite submitting the form more times than
+   * the hourly limit would start failing partway through for reasons that have
+   * nothing to do with what it is testing.
+   */
+  await prisma.rateLimitCounter.deleteMany();
+  await prisma.analyticsEvent.deleteMany();
   await prisma.contactMessage.deleteMany();
   await prisma.favorite.deleteMany();
   await prisma.order.deleteMany();

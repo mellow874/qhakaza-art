@@ -199,10 +199,10 @@ export function InvitationPanel({
     <div className="flex flex-col gap-8">
       {!emailConfigured && (
         <p className="border-line-strong bg-surface/50 text-muted border p-4 text-sm leading-relaxed">
-          <strong className="text-heading">Email is not connected.</strong> Invitations are
-          recorded and their links work, but nothing is delivered automatically — copy the link
-          below and send it yourself. Connecting a provider is a configuration change; no
-          invitation created now will need redoing.
+          <strong className="text-heading">Email is not connected.</strong> Invitations are recorded
+          and their links work, but nothing is delivered automatically — copy the link below and
+          send it yourself. Connecting a provider is a configuration change; no invitation created
+          now will need redoing.
         </p>
       )}
 
@@ -302,8 +302,8 @@ export function InvitationPanel({
           */}
           {issued.link.includes('localhost') && (
             <p className="text-danger text-xs leading-relaxed">
-              This link points at <strong>localhost</strong>, so it will only open on this
-              computer. Set <strong>COLLECTOR_URL</strong> (and <strong>ARTIST_PLATFORM_URL</strong>
+              This link points at <strong>localhost</strong>, so it will only open on this computer.
+              Set <strong>COLLECTOR_URL</strong> (and <strong>ARTIST_PLATFORM_URL</strong>
               for artists) on the Command Center, then redeploy, before sending invitations to
               anyone else.
             </p>

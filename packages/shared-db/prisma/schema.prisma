@@ -196,6 +196,14 @@ enum ActivationOutcome {
   EXPIRED_TOKEN
   REVOKED_TOKEN
   ROLE_DENIED
+
+  /// Turned away by the rate limiter before the token was examined.
+  ///
+  /// Recorded rather than dropped: sustained guessing is the single most
+  /// important thing this table exists to show, and it is precisely the
+  /// pattern that trips the limiter. Losing these rows would mean the log
+  /// went quiet at the moment it became interesting.
+  RATE_LIMITED
 }
 
 enum ArticleStatus {
@@ -263,13 +271,37 @@ model User {
 /// Core entity 5. Was `ArtistProfile`; renamed to match the canonical entity
 /// list. The table was renamed in place, not recreated.
 model Artist {
-  id          String   @id @default(cuid())
-  userId      String   @unique
+  id          String  @id @default(cuid())
+  userId      String  @unique
   displayName String
-  slug        String   @unique
+  slug        String  @unique
   statement   String?
   socials     Json?
-  approved    Boolean  @default(false)
+  approved    Boolean @default(false)
+
+  /// TWO BIOGRAPHIES, BOTH THE ARTIST'S OWN, confirmed by Qhakaza.
+  ///
+  /// `biographyPublic` is what may appear in a public projection. It is the
+  /// ONLY one of the two that is ever eligible for release, and it still
+  /// requires the artist's publication permission before it goes anywhere.
+  ///
+  /// `biographyInternal` is fuller and is for assessment. RLS is row-level,
+  /// not column-level, so this column is inside a row the public may read for
+  /// an approved artist - it is kept out of public output by the explicit
+  /// field whitelist in the catalogue queries, NOT by the policy. If a new
+  /// public read of Artist is ever written, it must select fields explicitly.
+  biographyPublic   String?
+  biographyInternal String?
+
+  /// How the artist describes their practice: materials, process, concerns.
+  /// Distinct from `statement`, which is preserved verbatim as their words
+  /// about the work itself.
+  practice String?
+
+  basedIn     String?
+  nationality String?
+  birthYear   Int?
+
   createdAt   DateTime @default(now()) @map("created_date")
   updatedAt   DateTime @updatedAt @map("updated_date")
   createdById String?  @map("created_by_id")
@@ -277,6 +309,16 @@ model Artist {
   user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   artworks    Artwork[]
   permissions ArtistPermission[]
+
+  // The record, in depth. Child tables throughout - see the section header.
+  mediums         ArtistMedium[]
+  exhibitions     ArtistExhibition[]
+  representations ArtistRepresentation[]
+  cvEntries       CvEntry[]
+  signals         InstitutionalSignal[]
+  links           ArtistLink[]
+  declaredPrices  DeclaredPrice[]
+  assessments     ReadinessAssessment[]
 
   @@index([approved])
   @@index([createdById])
@@ -325,6 +367,10 @@ model Artwork {
   favorites    Favorite[]
   notes        PrivateNoteSubmission[]
   custodies    CustodyPeriod[]
+
+  /// Every figure ever declared for this work. `price` above is the current
+  /// one; this is what it used to be, and who said so.
+  declaredPrices DeclaredPrice[]
 
   @@index([artistId])
   @@index([status])
@@ -600,6 +646,12 @@ model MediaAsset {
   status          MediaAssetStatus    @default(PENDING)
   confidentiality FileConfidentiality @default(INTERNAL)
 
+  /// WHAT THE DOCUMENT IS. Defect D2 in the Phase 0 audit: this table recorded
+  /// a file's size and MIME type but not whether it was a certificate, a
+  /// condition report or a passport scan. Nullable because existing rows
+  /// predate the taxonomy and guessing their type would be inventing a fact.
+  documentTypeId String?
+
   /// Ordering within its subject, for a gallery of several images.
   position Int @default(0)
 
@@ -611,8 +663,14 @@ model MediaAsset {
   updatedAt   DateTime @updatedAt @map("updated_date")
   createdById String?  @map("created_by_id")
 
+  documentType DocumentType?  @relation(fields: [documentTypeId], references: [id], onDelete: SetNull)
+  /// Everything this file is attached to. See DocumentLink for why the two
+  /// columns above are no longer the whole answer.
+  links        DocumentLink[]
+
   @@index([subjectType, subjectId, status])
   @@index([status, createdAt])
+  @@index([documentTypeId])
   @@index([uploadedById])
   @@index([createdById])
 }
@@ -1122,6 +1180,20 @@ enum EscalationStatus {
   DECLINED
 }
 
+/// What one link in a provenance chain asserts.
+enum ProvenanceLinkKind {
+  /// A change of hands we are recording as having happened.
+  TRANSFER
+  /// Custody is NOT established for this period. A first-class row, because a
+  /// chain that omits its unknowns misrepresents itself as complete.
+  UNKNOWN_INTERVAL
+  /// Asserted by someone, contested by someone else. Both sides stand.
+  DISPUTED_TRANSFER
+  /// Held by the same party across a period. Recorded for continuity, so a
+  /// long uneventful holding is not mistaken for a gap.
+  RETAINED
+}
+
 enum MethodologyStatus {
   DRAFT
   ACTIVE
@@ -1250,6 +1322,10 @@ model Party {
   transactionsFrom ProvenanceTransaction[] @relation("TransactionFrom")
   transactionsTo   ProvenanceTransaction[] @relation("TransactionTo")
   escalations      SpecialistEscalation[]
+  /// The same organisation as gallery-of-record and as institution. One row,
+  /// many roles - which is why Party was one table in the first place.
+  representations  ArtistRepresentation[]
+  signals          InstitutionalSignal[]
 
   @@index([name])
   @@index([createdById])
@@ -1268,6 +1344,8 @@ model Exhibition {
   createdById String?  @map("created_by_id")
 
   artworks ArtworkExhibition[]
+  /// The missing edge. Exhibitions existed; only artworks could reach them.
+  artists  ArtistExhibition[]
 
   @@index([title])
   @@index([createdById])
@@ -1291,7 +1369,19 @@ model Publication {
   @@index([createdById])
 }
 
-/// A change of hands. Provenance is a chain of these.
+/// One link in a provenance chain.
+///
+/// DEFECT D3 IN THE AUDIT. This table could only say "A sold to B on a date".
+/// A real provenance chain is mostly NOT that: it has periods where custody is
+/// unknown, transfers that are asserted but contested, and links that rest on
+/// a single unverified source. A table that can only express clean transfers
+/// forces the incomplete parts to be left out, and a chain with its gaps
+/// silently omitted reads as complete. That is the failure mode that matters,
+/// because a collector relies on it.
+///
+/// The gap is a ROW IN THE CHAIN rather than a separate table, so the chain is
+/// still one ordered sequence. Splitting it across two tables would mean
+/// reassembling and re-sorting it everywhere it is read.
 model ProvenanceTransaction {
   id          String    @id @default(cuid())
   artworkId   String
@@ -1302,6 +1392,27 @@ model ProvenanceTransaction {
   currency    String?
   notes       String?
 
+  /// What this link asserts. Existing rows are TRANSFER, which is what they
+  /// were when there was nothing else they could be.
+  kind ProvenanceLinkKind @default(TRANSFER)
+
+  /// Explicit position in the chain. Dates are frequently unknown or
+  /// approximate, so ordering by `occurredOn` alone puts undated links in an
+  /// arbitrary place - and for a gap, the absence of a date is the point.
+  sequence Int @default(0)
+
+  /// For a gap: the period custody could not be established. Both may be null
+  /// when even the boundaries are unknown, which is itself a finding.
+  periodStart DateTime?
+  periodEnd   DateTime?
+
+  verification     VerificationState @default(UNVERIFIED)
+  assertedVia      AssertionOrigin   @default(QHAKAZA_STAFF)
+  assertedById     String?
+  verifiedById     String?
+  verifiedAt       DateTime?
+  verificationNote String?
+
   createdAt   DateTime @default(now()) @map("created_date")
   updatedAt   DateTime @updatedAt @map("updated_date")
   createdById String?  @map("created_by_id")
@@ -1310,7 +1421,9 @@ model ProvenanceTransaction {
   fromParty Party?  @relation("TransactionFrom", fields: [fromPartyId], references: [id], onDelete: SetNull)
   toParty   Party?  @relation("TransactionTo", fields: [toPartyId], references: [id], onDelete: SetNull)
 
+  @@index([artworkId, sequence])
   @@index([artworkId, occurredOn])
+  @@index([artworkId, kind])
   @@index([createdById])
 }
 
@@ -1328,6 +1441,9 @@ model Source {
   createdById String?  @map("created_by_id")
 
   evidenceLinks EvidenceSource[]
+  /// Citations from anywhere else in the platform. Previously only Evidence
+  /// could reach a Source - see SourceReference.
+  references    SourceReference[]
 
   @@index([name])
   @@index([createdById])
@@ -1574,8 +1690,9 @@ model MethodologyVersion {
   updatedAt   DateTime @updatedAt @map("updated_date")
   createdById String?  @map("created_by_id")
 
-  assessments  Assessment[]
-  caseVersions CaseVersion[]
+  assessments          Assessment[]
+  caseVersions         CaseVersion[]
+  readinessAssessments ReadinessAssessment[]
 
   @@index([status, effectiveFrom])
   @@index([createdById])
@@ -2037,6 +2154,18 @@ enum VisibilityTier {
 /// many people approve it - enforced in RLS, not by convention.
 enum PermissionKind {
   STORE_MATERIAL
+
+  /// Permission to USE the material in internal assessment: to reason from it,
+  /// cite it in a Case, and let it inform a recommendation.
+  ///
+  /// Distinct from STORE_MATERIAL on purpose. Storing is custody; using is
+  /// application, and they are separable. An artist may hand over a contract
+  /// so it is on file for reference and not expect it weighed in an assessment
+  /// they cannot see. Collapsing the two would mean the narrower intention had
+  /// no way to be expressed, which is the same failure as having no permission
+  /// model at all.
+  USE_INTERNALLY
+
   SHARE_PRIVATELY_WITH_COLLECTORS
   USE_IN_PRIVATE_BRIEF
   PRESENT_TO_PARTNERS
@@ -2153,6 +2282,28 @@ model ArtworkRelease {
 ///
 /// `artworkId` null means the permission covers the artist's material as a
 /// whole. A work-specific row wins over a general one.
+/// What the artist has allowed Qhakaza to do, and what they have refused.
+///
+/// THE CONFLICT RULE: MORE RESTRICTIVE WINS.
+///
+/// A row with `artworkId` set applies to that work; a row with it null applies
+/// to everything the artist has. When both exist for the same kind, the
+/// permission holds only if EVERY applicable row grants it. One denial
+/// anywhere is a denial.
+///
+/// This was defect D6 in the Phase 0 audit and it was live: the check read
+/// `granted = true AND (artworkId IS NULL OR artworkId = <work>)`, an EXISTS
+/// over granting rows. An artist who permitted private sharing generally and
+/// then denied it for one particular work still had that work shown, because
+/// the general grant satisfied the EXISTS on its own. The rule was not merely
+/// missing - it was inverted, and it failed in the direction that shows work
+/// the artist asked to be held back.
+///
+/// The rule is now enforced in `qhakaza_permission_granted()` and every
+/// visibility path goes through it. See 20260820000200_permission_conflict.
+///
+/// An EXPIRED grant counts as no grant rather than as a denial: it withdraws
+/// permission without asserting that the artist refused.
 model ArtistPermission {
   id        String  @id @default(cuid())
   artistId  String
@@ -2164,6 +2315,16 @@ model ArtistPermission {
   /// What the artist actually did to confirm it, in their own record.
   confirmingAction String?
   decidedAt        DateTime @default(now())
+
+  /// A limit the artist placed on the grant, in their words: "South Africa
+  /// only", "not the 2019 series". Recorded and shown to staff; it is NOT
+  /// machine-enforced, and the admin surface says so rather than implying a
+  /// constraint the database does not apply.
+  scopeNote String?
+
+  /// When the grant lapses. A permission with no expiry does not expire; one
+  /// that has passed its expiry is treated as absent, not as a denial.
+  expiresAt DateTime?
 
   createdAt   DateTime @default(now()) @map("created_date")
   updatedAt   DateTime @updatedAt @map("updated_date")
@@ -2261,4 +2422,719 @@ model MatchSuggestion {
   @@index([membershipId, score])
   @@index([artworkId, score])
   @@index([createdById])
+}
+
+// ===========================================================================
+// THE ARTIST INTELLIGENCE PLATFORM
+//
+// The source records VERA will later operate on. Depth here, not breadth
+// elsewhere.
+//
+// THREE RULES SHAPE EVERYTHING BELOW, and they are worth stating once rather
+// than repeating on every model.
+//
+//  1. CHILD TABLES, NEVER BLOBS. An exhibition history in a JSON column is
+//     unqueryable, unverifiable and cannot carry its own source. Every
+//     repeating fact is a row.
+//
+//  2. WHAT IS TRUE IS SEPARATE FROM WHO SAID IT. Every asserted fact carries
+//     both `verification` (how well established) and `assertedVia`/`assertedById`
+//     (whose account it is). Collapsing the two is how "the artist told us" and
+//     "we confirmed it" become indistinguishable six months later.
+//
+//  3. NOTHING HERE DUPLICATES VERA. Exhibitions, publications, parties and
+//     sources already exist as first-class entities. These tables CONNECT an
+//     artist to them; they do not re-declare them.
+// ===========================================================================
+
+/// How well established an asserted fact is.
+///
+/// Deliberately NOT a boolean. "We have not looked" and "we looked and could
+/// not confirm" are different states, and an intelligence product that cannot
+/// tell them apart is misleading in the direction that matters.
+enum VerificationState {
+  /// Recorded, nothing done about it yet.
+  UNVERIFIED
+  /// The artist says so. An honest starting point, not a finding.
+  ARTIST_DECLARED
+  /// A document on file supports it. See the linked DocumentLink rows.
+  DOCUMENT_ON_FILE
+  /// Confirmed against a source independent of the artist.
+  INDEPENDENTLY_VERIFIED
+  /// Checked, and the check failed to establish it either way.
+  UNABLE_TO_VERIFY
+  /// Something credible contradicts it. Preserved, never quietly dropped.
+  DISPUTED
+}
+
+/// Whose account a fact is. Orthogonal to how well verified it is.
+enum AssertionOrigin {
+  ARTIST
+  QHAKAZA_STAFF
+  DOCUMENT
+  THIRD_PARTY
+}
+
+// --- Configurable lists ----------------------------------------------------
+//
+// Every one of these is a table rather than an enum because the brief requires
+// Qhakaza to extend the vocabulary without a developer and a deployment. They
+// share a shape: slug, label, active, ordering.
+
+/// Media an artist works in. Referenced by artists AND intended to replace the
+/// free-text `Artwork.medium` over time - that column stays for now so nothing
+/// breaks, but new capture should use this list.
+model Medium {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  label    String
+  /// A grouping for presentation: "Painting", "Photography", "Sculpture".
+  family   String?
+  active   Boolean @default(true)
+  ordering Int     @default(0)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artists ArtistMedium[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+/// Solo, group, biennale, art fair, institutional survey. The distinction
+/// carries real weight in an assessment, so it is not free text.
+model ExhibitionType {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  label    String
+  guidance String?
+  active   Boolean @default(true)
+  ordering Int     @default(0)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artistExhibitions ArtistExhibition[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+/// Kinds of institutional recognition: acquisition, residency, prize,
+/// commission, grant, collection inclusion.
+model SignalType {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  label    String
+  guidance String?
+  active   Boolean @default(true)
+  ordering Int     @default(0)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  signals InstitutionalSignal[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+/// Sections of a curriculum vitae: education, teaching, residency, award,
+/// selected press, public collection.
+model CvEntryType {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  label    String
+  active   Boolean @default(true)
+  ordering Int     @default(0)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  entries CvEntry[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+/// The nature of a representation arrangement: primary gallery, secondary
+/// market, estate, agent, self-represented.
+model RepresentationType {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  label    String
+  active   Boolean @default(true)
+  ordering Int     @default(0)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  representations ArtistRepresentation[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+/// WHAT A STORED FILE IS: certificate of authenticity, condition report,
+/// exhibition catalogue, invoice, correspondence, identity document.
+///
+/// Its absence was defect D2 in the Phase 0 audit. A file table that records
+/// size and MIME type but not what the document IS cannot answer the only
+/// question anyone asks of it.
+model DocumentType {
+  id                     String              @id @default(cuid())
+  slug                   String              @unique
+  label                  String
+  guidance               String?
+  /// The confidentiality a document of this type should default to. A
+  /// certificate and an identity document are not the same exposure.
+  defaultConfidentiality FileConfidentiality @default(INTERNAL)
+  active                 Boolean             @default(true)
+  ordering               Int                 @default(0)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  assets MediaAsset[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+/// A dimension an artist is assessed on for market readiness.
+///
+/// The criteria themselves are Qhakaza's proprietary framework and are
+/// configurable: the platform stores and applies them, and does not define
+/// them. No criterion is seeded by this migration for that reason.
+model ReadinessCriterion {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  label    String
+  /// What a reviewer should be looking for. Shown beside the rating.
+  guidance String?
+  /// Presentation order only. Never summed, never averaged - a readiness
+  /// score computed by a developer's arithmetic would be an invented finding.
+  ordering Int     @default(0)
+  active   Boolean @default(true)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  ratings ReadinessRating[]
+
+  @@index([active, ordering])
+  @@index([createdById])
+}
+
+// --- The artist record, in depth -------------------------------------------
+
+/// What an artist works in, and what they lead with.
+model ArtistMedium {
+  id       String  @id @default(cuid())
+  artistId String
+  mediumId String
+  /// A primary medium is what the artist is known for; others are secondary.
+  primary  Boolean @default(false)
+  note     String?
+
+  /// Withdrawn by the artist or by staff. NOT a delete: a claim that was
+  /// made and later retracted is itself part of the record, and a row that
+  /// can vanish cannot be reconciled against an assessment that relied on
+  /// it. Every read of this table filters on it.
+  removedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artist Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  medium Medium @relation(fields: [mediumId], references: [id], onDelete: Restrict)
+
+  @@unique([artistId, mediumId])
+  @@index([artistId, primary])
+  @@index([createdById])
+}
+
+/// An artist's showing history.
+///
+/// JOINS THE EXISTING `Exhibition` TABLE. The audit's central finding was that
+/// exhibitions already existed but only artworks could reach them; this is the
+/// missing edge, not a second exhibition table.
+model ArtistExhibition {
+  id           String  @id @default(cuid())
+  artistId     String
+  exhibitionId String
+  typeId       String?
+
+  /// The artist's part in it: exhibiting artist, featured, collaborator.
+  role      String?
+  curator   String?
+  /// Where the catalogue or listing can be found, in words.
+  reference String?
+
+  verification     VerificationState @default(UNVERIFIED)
+  assertedVia      AssertionOrigin   @default(ARTIST)
+  assertedById     String?
+  verifiedById     String?
+  verifiedAt       DateTime?
+  verificationNote String?
+
+  /// Withdrawn by the artist or by staff. NOT a delete: a claim that was
+  /// made and later retracted is itself part of the record, and a row that
+  /// can vanish cannot be reconciled against an assessment that relied on
+  /// it. Every read of this table filters on it.
+  removedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artist     Artist          @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  exhibition Exhibition      @relation(fields: [exhibitionId], references: [id], onDelete: Cascade)
+  type       ExhibitionType? @relation(fields: [typeId], references: [id], onDelete: SetNull)
+
+  @@unique([artistId, exhibitionId])
+  @@index([artistId, verification])
+  @@index([createdById])
+}
+
+/// Who represents this artist, where, and for how long.
+///
+/// The gallery is a `Party` - the same row that may appear as a seller in a
+/// provenance chain. One organisation, one record, many roles.
+model ArtistRepresentation {
+  id       String  @id @default(cuid())
+  artistId String
+  partyId  String
+  typeId   String?
+
+  /// Where the arrangement applies. Free text: "South Africa", "worldwide
+  /// excluding North America". Territories are negotiated, not enumerable.
+  territory String?
+  startDate DateTime?
+  endDate   DateTime?
+  /// Denormalised from endDate for the common query, and kept honest by the
+  /// application: an arrangement with no end date is not automatically current.
+  current   Boolean   @default(true)
+  exclusive Boolean?
+  note      String?
+
+  verification     VerificationState @default(UNVERIFIED)
+  assertedVia      AssertionOrigin   @default(ARTIST)
+  assertedById     String?
+  verifiedById     String?
+  verifiedAt       DateTime?
+  verificationNote String?
+
+  /// Withdrawn by the artist or by staff. NOT a delete: a claim that was
+  /// made and later retracted is itself part of the record, and a row that
+  /// can vanish cannot be reconciled against an assessment that relied on
+  /// it. Every read of this table filters on it.
+  removedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artist Artist              @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  party  Party               @relation(fields: [partyId], references: [id], onDelete: Restrict)
+  type   RepresentationType? @relation(fields: [typeId], references: [id], onDelete: SetNull)
+
+  @@index([artistId, current])
+  @@index([partyId])
+  @@index([createdById])
+}
+
+/// One line of a curriculum vitae.
+///
+/// Structured rather than an uploaded PDF, because a CV that cannot be queried
+/// cannot be assessed. The uploaded PDF is still welcome - it attaches as a
+/// document and becomes the source that verifies these rows.
+model CvEntry {
+  id       String  @id @default(cuid())
+  artistId String
+  typeId   String?
+
+  title        String
+  organisation String?
+  location     String?
+  /// Years rather than dates: a CV says "2019", not "14 March 2019".
+  startYear    Int?
+  endYear      Int?
+  detail       String?
+  ordering     Int     @default(0)
+
+  verification     VerificationState @default(UNVERIFIED)
+  assertedVia      AssertionOrigin   @default(ARTIST)
+  assertedById     String?
+  verifiedById     String?
+  verifiedAt       DateTime?
+  verificationNote String?
+
+  /// Withdrawn by the artist or by staff. NOT a delete: a claim that was
+  /// made and later retracted is itself part of the record, and a row that
+  /// can vanish cannot be reconciled against an assessment that relied on
+  /// it. Every read of this table filters on it.
+  removedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artist Artist       @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  type   CvEntryType? @relation(fields: [typeId], references: [id], onDelete: SetNull)
+
+  @@index([artistId, ordering])
+  @@index([artistId, verification])
+  @@index([createdById])
+}
+
+/// Recognition by an institution: an acquisition, a residency, a prize, a
+/// commission, inclusion in a public collection.
+///
+/// These are the strongest signals in the record and the ones most worth
+/// verifying, which is why the institution is a `Party` rather than a string.
+model InstitutionalSignal {
+  id           String  @id @default(cuid())
+  artistId     String
+  signalTypeId String?
+  /// The institution, when it is one we hold a record for.
+  partyId      String?
+  /// Its name as stated, kept even when no Party row exists yet.
+  institution  String?
+
+  description String
+  occurredOn  DateTime?
+  year        Int?
+
+  verification     VerificationState @default(UNVERIFIED)
+  assertedVia      AssertionOrigin   @default(ARTIST)
+  assertedById     String?
+  verifiedById     String?
+  verifiedAt       DateTime?
+  verificationNote String?
+
+  /// Withdrawn by the artist or by staff. NOT a delete: a claim that was
+  /// made and later retracted is itself part of the record, and a row that
+  /// can vanish cannot be reconciled against an assessment that relied on
+  /// it. Every read of this table filters on it.
+  removedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artist     Artist      @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  signalType SignalType? @relation(fields: [signalTypeId], references: [id], onDelete: SetNull)
+  party      Party?      @relation(fields: [partyId], references: [id], onDelete: SetNull)
+
+  @@index([artistId, verification])
+  @@index([partyId])
+  @@index([createdById])
+}
+
+/// An artist's presence elsewhere: website, portfolio, gallery page, press.
+///
+/// Replaces the `Artist.socials` JSON blob, which could not be verified, could
+/// not be typed and could not carry a source. That column stays for now so
+/// existing reads keep working; new capture writes here.
+model ArtistLink {
+  id       String @id @default(cuid())
+  artistId String
+
+  /// "Website", "Instagram", "Gallery page", "Press". Free text on purpose -
+  /// platforms come and go faster than a configurable list is worth.
+  kind  String
+  label String?
+  url   String
+
+  verification VerificationState @default(UNVERIFIED)
+  checkedAt    DateTime?
+
+  /// Withdrawn by the artist or by staff. NOT a delete: a claim that was
+  /// made and later retracted is itself part of the record, and a row that
+  /// can vanish cannot be reconciled against an assessment that relied on
+  /// it. Every read of this table filters on it.
+  removedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  artist Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@index([artistId])
+  @@index([createdById])
+}
+
+// --- Append-only history ---------------------------------------------------
+//
+// The three tables below are INSERT-only at the grant level as well as the
+// policy level, following the pattern established in
+// 20260813001100_append_only_hardening. A price that can be edited is not a
+// pricing history, and an assessment that can be rewritten is not a record of
+// what was decided.
+
+/// A declared value, at a point in time, by someone named.
+///
+/// Defect D4 in the audit: `Artwork.price` is one column, so changing a price
+/// destroyed the previous one. Every declaration now survives. `Artwork.price`
+/// remains as the CURRENT figure for existing reads; this is the history
+/// behind it.
+///
+/// "Declared" is doing real work in the name. This is what was asked or
+/// stated - it is NOT a valuation, and nothing in the platform should present
+/// it as one.
+model DeclaredPrice {
+  id        String  @id @default(cuid())
+  artistId  String?
+  artworkId String?
+
+  amount   Decimal @db.Decimal(14, 2)
+  currency String  @default("ZAR")
+
+  /// Why this figure: "artist's asking price", "gallery retail", "insurance".
+  basis String?
+  note  String?
+
+  declaredOn   DateTime        @default(now())
+  declaredVia  AssertionOrigin @default(ARTIST)
+  declaredById String?
+
+  /// True for the figure currently in force. Set by the application when a
+  /// newer declaration arrives; never a reason to edit the older row.
+  current Boolean @default(true)
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  createdById String?  @map("created_by_id")
+
+  artist  Artist?  @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  artwork Artwork? @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  @@index([artworkId, current])
+  @@index([artistId, declaredOn])
+  @@index([createdById])
+}
+
+/// One assessment of an artist against the readiness framework, on one date,
+/// by one named reviewer.
+///
+/// NEVER VISIBLE TO THE ARTIST. Confirmed as absolute by Qhakaza. This is not
+/// enforced by hope: there is no `artist` grant on this table or on
+/// ReadinessRating in the RLS matrix, so an artist session cannot read a row
+/// even if a query asks for one.
+model ReadinessAssessment {
+  id       String @id @default(cuid())
+  artistId String
+
+  /// Which version of the framework this was judged under, so a historical
+  /// assessment keeps the criteria it was actually made against.
+  methodologyVersionId String?
+
+  /// The reviewer's overall position, in their own words. Deliberately text
+  /// and not a score - see ReadinessCriterion.ordering.
+  summary        String?
+  /// A recommendation, not a decision. Approval remains a separate act.
+  recommendation String?
+
+  assessedById String?
+  assessedAt   DateTime @default(now())
+
+  /// A superseding assessment points back at what it replaces. The replaced
+  /// row is untouched.
+  supersedesId String? @unique
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  createdById String?  @map("created_by_id")
+
+  artist             Artist               @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  methodologyVersion MethodologyVersion?  @relation(fields: [methodologyVersionId], references: [id], onDelete: SetNull)
+  supersedes         ReadinessAssessment? @relation("ReadinessSupersedes", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy       ReadinessAssessment? @relation("ReadinessSupersedes")
+  ratings            ReadinessRating[]
+
+  @@index([artistId, assessedAt])
+  @@index([createdById])
+}
+
+/// How one criterion was rated within one assessment.
+model ReadinessRating {
+  id           String @id @default(cuid())
+  assessmentId String
+  criterionId  String
+
+  /// The rating as a label, from the criterion's own vocabulary. Not a number:
+  /// numbers invite averaging, and an averaged readiness score is a finding
+  /// nobody made.
+  rating   String?
+  evidence String?
+  concern  String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  createdById String?  @map("created_by_id")
+
+  assessment ReadinessAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  criterion  ReadinessCriterion  @relation(fields: [criterionId], references: [id], onDelete: Restrict)
+
+  @@unique([assessmentId, criterionId])
+  @@index([criterionId])
+  @@index([createdById])
+}
+
+/// Every change to an artist or artwork record, field by field.
+///
+/// `AuditLog` records that an action happened. This records what a specific
+/// field held before and after, which is the question asked when a record is
+/// challenged: not "was it edited" but "what did it say when we relied on it".
+model RecordChange {
+  id String @id @default(cuid())
+
+  subjectType String
+  subjectId   String
+  /// Dotted for child rows: "cvEntry.title", "representation.territory".
+  field       String
+
+  previousValue String?
+  newValue      String?
+
+  changedById String?
+  changedRole Role?
+  changedAt   DateTime @default(now())
+  reason      String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  createdById String?  @map("created_by_id")
+
+  @@index([subjectType, subjectId, changedAt])
+  @@index([changedById, changedAt])
+  @@index([createdById])
+}
+
+// --- Documents and sources -------------------------------------------------
+
+/// A stored file's attachment to a record. Many per file.
+///
+/// DEFECT D1 IN THE AUDIT. `MediaAsset` addressed exactly one owner through
+/// `subjectType`/`subjectId`, so one document could belong to one record. The
+/// brief's own example breaks that: an exhibition catalogue evidences BOTH the
+/// artist's exhibition history AND a work's provenance. Under the old shape
+/// that meant uploading the same PDF twice and hoping the two copies stayed
+/// consistent - which is the duplication this phase exists to prevent.
+///
+/// The columns on MediaAsset stay and are backfilled into this table as the
+/// primary link, so nothing that reads them today breaks.
+model DocumentLink {
+  id           String @id @default(cuid())
+  mediaAssetId String
+
+  /// "Artist", "Artwork", "ArtistExhibition", "ProvenanceTransaction", ...
+  /// A string for the same reason MediaAsset.subjectType is one: VERA adds
+  /// subjects, and a new one should not need a migration.
+  subjectType String
+  subjectId   String
+
+  /// Why the document is attached HERE, which may differ per link. The same
+  /// catalogue is "exhibition record" on one and "provenance support" on
+  /// another.
+  role String?
+
+  /// The link created by backfill from MediaAsset's own columns. Exactly one
+  /// per asset; the rest are additional attachments.
+  primaryLink Boolean @default(false)
+
+  /// Withdrawn by the artist or by staff. NOT a delete: a claim that was
+  /// made and later retracted is itself part of the record, and a row that
+  /// can vanish cannot be reconciled against an assessment that relied on
+  /// it. Every read of this table filters on it.
+  removedAt DateTime?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  mediaAsset MediaAsset @relation(fields: [mediaAssetId], references: [id], onDelete: Cascade)
+
+  @@unique([mediaAssetId, subjectType, subjectId])
+  @@index([subjectType, subjectId])
+  @@index([createdById])
+}
+
+/// A record citing the source that supports it.
+///
+/// DEFECT D5 IN THE AUDIT, and the one the brief calls "the VERA hook - build
+/// it properly". `Source` existed, but only `Evidence` could reach it, so
+/// nothing on an artist or an artwork could say where it came from. Every
+/// assertion in the platform can now point at what stands behind it.
+///
+/// Polymorphic for the same reason as DocumentLink, and additionally because
+/// the interesting citation is often on a CHILD row - this exhibition, this
+/// provenance link - not on the artist as a whole.
+model SourceReference {
+  id       String @id @default(cuid())
+  sourceId String
+
+  subjectType String
+  subjectId   String
+  /// Which assertion on that record the source supports. Null means the
+  /// record as a whole.
+  field       String?
+
+  /// Where in the source: page, catalogue number, URL, shelf mark.
+  locator String?
+  /// What the source actually says, quoted. Kept because a source that has
+  /// moved or gone offline still has to be answerable for.
+  extract String?
+
+  /// How this citation was reached, distinct from the source's own standing.
+  assertedVia  AssertionOrigin @default(QHAKAZA_STAFF)
+  assertedById String?
+
+  createdAt   DateTime @default(now()) @map("created_date")
+  updatedAt   DateTime @updatedAt @map("updated_date")
+  createdById String?  @map("created_by_id")
+
+  source Source @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([subjectType, subjectId])
+  @@index([sourceId])
+  @@index([createdById])
+}
+
+/// A fixed-window request counter, for rate limiting.
+///
+/// IN THE DATABASE RATHER THAN IN MEMORY, because the apps run on Vercel where
+/// each serverless instance has its own memory. An in-memory limiter there
+/// counts a fraction of the requests and lets the rest through, which is worse
+/// than none: it reads as a control and is not one.
+///
+/// FIXED WINDOW, not sliding, and worth being honest about. A caller can send
+/// the limit twice across a window boundary. That is an acceptable trade for a
+/// counter that costs one upsert and needs no background sweep, given what
+/// this protects: public forms against flooding, not an API against a
+/// determined attacker.
+///
+/// Rows are written with no actor, from `asSystem` - rate limiting happens
+/// before anyone is authenticated, which is exactly when it matters.
+model RateLimitCounter {
+  id String @id @default(cuid())
+
+  /// What is being limited and by whom: "contact:203.0.113.5". The value is
+  /// hashed at the call site where it carries personal data.
+  bucket      String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  createdAt DateTime @default(now()) @map("created_date")
+  updatedAt DateTime @updatedAt @map("updated_date")
+
+  @@unique([bucket, windowStart])
+  @@index([windowStart])
 }

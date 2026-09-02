@@ -29,12 +29,32 @@ export type AdminResult<T = undefined> =
 const INVITATION_DAYS = 14;
 
 /** Vetting: an artist becomes visible to the public and to members. */
+/**
+ * Approve an artist, or withdraw approval.
+ *
+ * APPROVAL IS NOT PUBLICATION AND NOT RELEASE. It accepts an artist onto the
+ * platform. It puts nothing in front of a collector and nothing on the public
+ * site - both need a release AND the artist's permission, neither of which
+ * this touches.
+ *
+ * `reason` IS OPTIONAL HERE AND REQUIRED BY THE DOSSIER SCREEN. The dashboard
+ * offers a quick approve from a queue; the artist record is where the decision
+ * is actually considered, and that surface asks for a reason before it will
+ * submit. Making it required in both would mean either a reason typed into a
+ * queue to get past a validation error - which is worse than none - or leaving
+ * the considered surface unable to capture one.
+ */
 export async function setArtistApproval(input: {
   artistId: string;
   approved: boolean;
+  reason?: string;
 }): Promise<AdminResult> {
   const actor = commandCentreActor(await auth());
   if (isFailure(actor)) return actor;
+
+  // Analysts work Cases, evidence and research. Accepting an artist onto the
+  // platform is not theirs to do.
+  if (actor.role === 'ANALYST') return { ok: false, error: 'FORBIDDEN' };
 
   const artist = await readAs(actor, (tx) =>
     tx.artist.findUnique({
@@ -44,6 +64,8 @@ export async function setArtistApproval(input: {
   );
   if (!artist) return { ok: false, error: 'NOT_FOUND' };
 
+  const reason = input.reason?.trim() || null;
+
   try {
     await performAudited({
       actor,
@@ -52,12 +74,30 @@ export async function setArtistApproval(input: {
       entityId: artist.id,
       summary: `${artist.displayName} ${input.approved ? 'approved' : 'approval withdrawn'}`,
       before: { approved: artist.approved },
-      after: { approved: input.approved },
-      run: (tx) =>
-        tx.artist.update({ where: { id: artist.id }, data: { approved: input.approved } }),
+      after: { approved: input.approved, reason },
+      run: async (tx) => {
+        await tx.artist.update({ where: { id: artist.id }, data: { approved: input.approved } });
+
+        // Also written to the record's own history. AuditLog answers "who did
+        // what"; RecordChange answers "what did this record say, and when" -
+        // which is the question asked when a decision is challenged.
+        await tx.recordChange.create({
+          data: {
+            subjectType: 'Artist',
+            subjectId: artist.id,
+            field: 'artist.approved',
+            previousValue: String(artist.approved),
+            newValue: String(input.approved),
+            reason,
+            changedById: actor.userId,
+            changedRole: actor.role,
+          },
+        });
+      },
     });
 
     revalidatePath('/');
+    revalidatePath('/artists');
     return { ok: true };
   } catch (error) {
     console.error('setArtistApproval failed', error);

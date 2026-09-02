@@ -7,7 +7,7 @@ import { Button, Field, buttonStyles, cn } from '@qhakaza/shared-ui';
 import { apply } from '@/content/collectors';
 import { collectorApplicationSchema } from '@/lib/validation/collector';
 
-type Result = { ok: boolean; fieldErrors?: Record<string, string> };
+type Result = { ok: boolean; error?: string; fieldErrors?: Record<string, string> };
 
 type Values = {
   fullName: string;
@@ -102,6 +102,13 @@ export function CollectorApplyForm({
         setValues(EMPTY);
       } else if (result.fieldErrors) {
         setErrors(result.fieldErrors);
+      } else if (result.error === 'RATE_LIMITED') {
+        // Said plainly. The generic message invites a retry, which is the one
+        // thing that will not help — and an applicant who thinks the form is
+        // broken is an applicant lost.
+        setFormError(
+          'We have already received several applications from you. Please give it an hour before trying again.',
+        );
       } else {
         setFormError(apply.error);
       }

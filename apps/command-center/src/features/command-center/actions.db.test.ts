@@ -54,6 +54,7 @@ async function makeIntake() {
 
 beforeEach(async () => {
   await prisma.auditLog.deleteMany();
+  await prisma.recordChange.deleteMany();
   await prisma.activationAttempt.deleteMany();
   await prisma.memberInvitation.deleteMany();
   await prisma.membership.deleteMany();
@@ -127,8 +128,44 @@ describe('every action is audited', () => {
     expect(entry.actorId).toBe('admin-1');
     expect(entry.actorRole).toBe('ADMIN');
     expect(entry.before).toEqual({ approved: false });
-    expect(entry.after).toEqual({ approved: true });
+    // `reason` is null from this call site: the dashboard offers a quick
+    // approve from the queue, and the artist record screen is where a reason
+    // is asked for. See setArtistApproval.
+    expect(entry.after).toEqual({ approved: true, reason: null });
     expect(entry.ipAddress).toBe('203.0.113.5');
+  });
+
+  it('writes the approval to the record history as well as the audit log', async () => {
+    // Two logs, two questions. AuditLog answers "who did what"; RecordChange
+    // answers "what did this record say, and when" - which is what gets asked
+    // when a decision is challenged months later.
+    const { artist } = await makeArtistWithWork();
+
+    await setArtistApproval({
+      artistId: artist.id,
+      approved: true,
+      reason: 'Strong exhibition history, documentation complete',
+    });
+
+    const change = await prisma.recordChange.findFirstOrThrow({
+      where: { subjectId: artist.id, field: 'artist.approved' },
+    });
+    expect(change.previousValue).toBe('false');
+    expect(change.newValue).toBe('true');
+    expect(change.reason).toContain('documentation complete');
+  });
+
+  it('refuses an analyst', async () => {
+    // Analysts work Cases, evidence and research. Accepting an artist onto the
+    // platform is not theirs to do.
+    const { artist } = await makeArtistWithWork();
+    auth.mockResolvedValue({ user: { id: 'analyst-1', role: 'ANALYST' } });
+
+    const result = await setArtistApproval({ artistId: artist.id, approved: true });
+
+    expect(result.ok).toBe(false);
+    const after = await prisma.artist.findUniqueOrThrow({ where: { id: artist.id } });
+    expect(after.approved).toBe(false);
   });
 
   it('records a release, a verification, an invitation and a role change', async () => {

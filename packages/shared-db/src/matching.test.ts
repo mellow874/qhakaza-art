@@ -42,7 +42,9 @@ describe('scoreMatch', () => {
     const match = scoreMatch(work(), collector());
 
     // medium 3 + one theme 2 + region 1
-    expect(match.score).toBe(DEFAULT_WEIGHTS.medium + DEFAULT_WEIGHTS.theme + DEFAULT_WEIGHTS.region);
+    expect(match.score).toBe(
+      DEFAULT_WEIGHTS.medium + DEFAULT_WEIGHTS.theme + DEFAULT_WEIGHTS.region,
+    );
   });
 
   it('weighs medium above theme, and theme above region', () => {
@@ -145,7 +147,11 @@ describe('ranking', () => {
 describe('profileFromSources', () => {
   it('folds the intake and the note into one shape', () => {
     const profile = profileFromSources({
-      intake: { preferredMediums: ['Painting'], country: 'South Africa', collectingGoal: 'Build slowly' },
+      intake: {
+        preferredMediums: ['Painting'],
+        country: 'South Africa',
+        collectingGoal: 'Build slowly',
+      },
       note: {
         mediums: ['Photography'],
         regions: ['West Africa'],

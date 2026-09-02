@@ -3,7 +3,12 @@
 import { revalidatePath } from 'next/cache';
 
 import { auth } from '@qhakaza/shared-auth/server';
-import { profileFromSources, rankCollectorsForWork, rankWorksForCollector } from '@qhakaza/shared-db';
+import {
+  decidePermission,
+  profileFromSources,
+  rankCollectorsForWork,
+  rankWorksForCollector,
+} from '@qhakaza/shared-db';
 
 import { commandCentreActor, isFailure, performAudited, readAs } from '@/lib/audit';
 
@@ -17,8 +22,7 @@ import { commandCentreActor, isFailure, performAudited, readAs } from '@/lib/aud
  */
 
 export type AudienceResult<T = undefined> =
-  | ({ ok: true } & (T extends undefined ? object : T))
-  | { ok: false; error: string };
+  ({ ok: true } & (T extends undefined ? object : T)) | { ok: false; error: string };
 
 /** Create a named group work can be placed with. */
 export async function createAudience(input: {
@@ -43,7 +47,10 @@ export async function createAudience(input: {
       after: { name, type: input.typeSlug ?? null },
       run: async (tx) => {
         const type = input.typeSlug
-          ? await tx.audienceType.findUnique({ where: { slug: input.typeSlug }, select: { id: true } })
+          ? await tx.audienceType.findUnique({
+              where: { slug: input.typeSlug },
+              select: { id: true },
+            })
           : null;
 
         const audience = await tx.audience.create({
@@ -94,7 +101,10 @@ export async function setAudienceMembership(input: {
           // Rejoining clears the removal rather than writing a second row, so
           // the audience never holds two entries for one person.
           if (existing) {
-            await tx.audienceMember.update({ where: { id: existing.id }, data: { removedAt: null } });
+            await tx.audienceMember.update({
+              where: { id: existing.id },
+              data: { removedAt: null },
+            });
           } else {
             await tx.audienceMember.create({
               data: {
@@ -159,19 +169,26 @@ export async function releaseArtwork(input: {
     return { ok: false, error: `A work that is ${artwork.status} cannot be placed with anyone.` };
   }
 
-  const permitted = await readAs(actor, (tx) =>
-    tx.artistPermission.findFirst({
+  /*
+   * EVERY row for this artist and kind, granted and denied alike.
+   *
+   * This query used to carry `granted: true` and take the first hit, which
+   * meant an artist-wide grant answered for a work-specific refusal and the
+   * work was released anyway. Filtering to grants before deciding removes
+   * exactly the rows that decide. `decidePermission` applies the rule.
+   */
+  const permissions = await readAs(actor, (tx) =>
+    tx.artistPermission.findMany({
       where: {
         artistId: artwork.artistId,
         kind: requiredPermission as 'PUBLISH_PUBLICLY',
-        granted: true,
         OR: [{ artworkId: null }, { artworkId: artwork.id }],
       },
-      select: { id: true },
+      select: { artworkId: true, granted: true, expiresAt: true },
     }),
   );
 
-  if (!permitted) {
+  if (!decidePermission(permissions, artwork.id)) {
     return {
       ok: false,
       error:
@@ -205,7 +222,9 @@ export async function releaseArtwork(input: {
 
         await tx.artwork.update({
           where: { id: artwork.id },
-          data: { status: tier === 'PUBLIC_EDITORIAL' ? 'PUBLIC_EDITORIAL' : 'RELEASED_TO_AUDIENCE' },
+          data: {
+            status: tier === 'PUBLIC_EDITORIAL' ? 'PUBLIC_EDITORIAL' : 'RELEASED_TO_AUDIENCE',
+          },
         });
       },
     });
@@ -335,7 +354,11 @@ export async function syncCollectorProfile(input: {
       run: async (tx) => {
         const membership = await tx.membership.findUnique({
           where: { id: input.membershipId },
-          select: { intake: { select: { preferredMediums: true, country: true, collectingGoal: true, email: true } } },
+          select: {
+            intake: {
+              select: { preferredMediums: true, country: true, collectingGoal: true, email: true },
+            },
+          },
         });
 
         const note = membership?.intake?.email
