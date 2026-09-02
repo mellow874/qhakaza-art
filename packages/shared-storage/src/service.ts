@@ -133,7 +133,7 @@ export class SupabaseStorageService implements StorageService {
       .list(prefix, { search: name, limit: 1 });
 
     if (error || !data) return false;
-    return data.some((entry) => entry.name === name);
+    return data.some((entry: { name: string }) => entry.name === name);
   }
 }
 
