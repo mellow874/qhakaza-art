@@ -7,10 +7,15 @@
  * invitation flow works end to end today; connecting Resend later changes one
  * environment variable and no application code.
  *
- * The sending address is desk@qhakazaartcollective.co.za. Before real mail can
- * leave, three DNS records (SPF, DKIM, return-path) must exist on that domain,
- * or everything Qhakaza sends will be filed as spam. That is an open item on
- * the founder, not a development task.
+ * THE SENDING ADDRESS IS CONFIGURATION, NOT A CONSTANT. `EMAIL_FROM` must sit
+ * at a domain verified with the provider - which is usually a dedicated
+ * sending subdomain rather than the organisation's main domain, because
+ * transactional mail should not put the main domain's reputation at risk. Mail
+ * sent from the parent domain of a verified subdomain is rejected, and that is
+ * the mistake worth knowing about before it is made.
+ *
+ * `EMAIL_REPLY_TO` exists because that subdomain normally has no mailbox. It
+ * points replies at an address a person actually reads.
  */
 
 export type EmailAddress = string;
@@ -25,15 +30,22 @@ export type EmailMessage = {
 };
 
 export type SendResult =
-  | { ok: true; provider: string; id?: string }
-  | { ok: false; provider: string; error: string };
+  { ok: true; provider: string; id?: string } | { ok: false; provider: string; error: string };
 
 export interface EmailService {
   readonly name: string;
   send(message: EmailMessage): Promise<SendResult>;
 }
 
-/** The address every Qhakaza email is sent from. */
+/**
+ * The address every Qhakaza email is sent from.
+ *
+ * MUST BE AT A DOMAIN VERIFIED WITH THE PROVIDER, or the send is rejected
+ * outright. This default is a placeholder: set `EMAIL_FROM` to the real
+ * address, and check it against the verified domain rather than against the
+ * organisation's main one. Those are often not the same - a sending subdomain
+ * is the usual arrangement, and mail from the parent domain will fail.
+ */
 export const DEFAULT_FROM = 'Qhakaza Art Collective <desk@qhakazaartcollective.co.za>';
 
 /**
@@ -81,6 +93,15 @@ export class ResendEmailService implements EmailService {
   constructor(
     private readonly apiKey: string,
     private readonly from: string = DEFAULT_FROM,
+    /**
+     * Where replies should go, when the message does not name its own.
+     *
+     * SEPARATE FROM `from` ON PURPOSE. Transactional mail is normally sent
+     * from a dedicated subdomain, which protects the main domain's sending
+     * reputation - but that subdomain has no mailbox behind it. Without a
+     * reply-to, someone answering an invitation is writing into nothing.
+     */
+    private readonly replyTo?: string,
   ) {}
 
   async send(message: EmailMessage): Promise<SendResult> {
@@ -97,7 +118,9 @@ export class ResendEmailService implements EmailService {
           subject: message.subject,
           text: message.text,
           ...(message.html ? { html: message.html } : {}),
-          ...(message.replyTo ? { reply_to: message.replyTo } : {}),
+          // The message's own choice wins; the configured address is the
+          // fallback so every mail has somewhere for a reply to land.
+          ...(message.replyTo || this.replyTo ? { reply_to: message.replyTo ?? this.replyTo } : {}),
         }),
       });
 
@@ -135,11 +158,12 @@ export class ResendEmailService implements EmailService {
  */
 export function emailServiceFromEnv(env: NodeJS.ProcessEnv = process.env): EmailService {
   const from = env.EMAIL_FROM?.trim() || DEFAULT_FROM;
+  const replyTo = env.EMAIL_REPLY_TO?.trim() || undefined;
   const provider = (env.EMAIL_PROVIDER?.trim() || 'logging').toLowerCase();
 
   if (provider === 'resend') {
     const key = env.RESEND_API_KEY?.trim();
-    if (key) return new ResendEmailService(key, from);
+    if (key) return new ResendEmailService(key, from, replyTo);
 
     console.warn(
       'EMAIL_PROVIDER=resend but RESEND_API_KEY is not set. ' +
