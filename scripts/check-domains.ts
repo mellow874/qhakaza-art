@@ -15,10 +15,10 @@
  * Vercel matched the hostname to the right project - which is exactly what
  * this script exists to confirm.
  *
- * That distinction matters right now, because the database is unreachable and
- * every data-backed page is returning 500 regardless of the domain. Without
- * this separation the two faults are indistinguishable, and the domain work
- * would look broken when it is fine.
+ * That distinction earned itself during the move: the database was paused at
+ * the time, so every data-backed page was returning 500 regardless of the
+ * domain. Without separating the two, correct DNS looked broken. Keep the
+ * separation - the next outage will not announce itself either.
  */
 
 /**
@@ -197,3 +197,10 @@ main().catch((error) => {
   console.error('Could not complete the check:', error);
   process.exit(1);
 });
+
+/*
+ * Marks this file as a module rather than a global script. Without it, two
+ * standalone scripts that each define `main` collide at the type level even
+ * though they never run together.
+ */
+export {};
