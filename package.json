@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:all": "npm run typecheck && npm run test",
+    "check:domains": "tsx scripts/check-domains.ts",
     "db:up": "tsx scripts/db.ts up",
     "db:down": "tsx scripts/db.ts down",
     "db:status": "tsx scripts/db.ts status",
