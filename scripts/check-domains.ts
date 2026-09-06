@@ -21,8 +21,16 @@
  * would look broken when it is fine.
  */
 
-/** What we expect a correctly-pointed hostname to look like. */
-const VERCEL_CNAME_HINT = 'vercel-dns.com';
+/**
+ * What a correctly-pointed hostname looks like.
+ *
+ * DELIBERATELY NOT `vercel-dns.com`. Vercel issues a per-domain CNAME - the
+ * observed form is `<hex>.vercel-dns-017.com`, with a numbered suffix on the
+ * domain itself - so matching the full literal reported perfectly good records
+ * as wrong. Matching the stem covers both that and the older
+ * `cname.vercel-dns.com`.
+ */
+const VERCEL_CNAME_HINT = 'vercel-dns';
 
 type Target = {
   host: string;
