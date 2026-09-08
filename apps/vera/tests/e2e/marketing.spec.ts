@@ -361,10 +361,9 @@ test.describe('contact', () => {
   test('shows the enquiries address as a mailto link', async ({ page }) => {
     await page.goto('/contact', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByRole('link', { name: 'info@qhakazaartcollective.com' })).toHaveAttribute(
-      'href',
-      'mailto:info@qhakazaartcollective.com',
-    );
+    await expect(
+      page.getByRole('link', { name: 'desk@qhakazaartcollective.co.za' }),
+    ).toHaveAttribute('href', 'mailto:desk@qhakazaartcollective.co.za');
   });
 
   test('offers the full enquiry form', async ({ page }) => {

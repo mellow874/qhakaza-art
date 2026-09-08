@@ -13,7 +13,15 @@ export const hero = {
 export const intro = {
   body: 'For enquiries about the platform, subscriptions, or general questions, please use the form opposite. We aim to respond within two business days.',
   enquiriesLabel: 'General enquiries',
-  email: 'info@qhakazaartcollective.com',
+  /*
+   * The address the public is invited to write to.
+   *
+   * This read info@qhakazaartcollective.com, on a domain nobody has ever
+   * registered - so every enquiry sent through the site bounced, and Qhakaza
+   * had no way of knowing. It now points at the mailbox they actually read,
+   * which is also the address invitations are sent from.
+   */
+  email: 'desk@qhakazaartcollective.co.za',
 };
 
 export const form = {
